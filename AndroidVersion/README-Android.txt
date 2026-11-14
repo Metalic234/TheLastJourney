@@ -1,5 +1,26 @@
-THE LAST JOURNEY — Android Edition (v1.3)
+THE LAST JOURNEY — Android Edition (v1.4)
 ==========================================
+
+WHAT'S NEW IN v1.4
+------------------
+SIGNED WITH A PERMANENT RELEASE KEY
+- The APK used to be signed with a throwaway debug key (v1.0–v1.3). It is
+  now signed with a real release key: 4096-bit RSA, validity to 2054.
+- Every future build signed with this same key installs straight over the
+  current app. No uninstall each time, and your saved progress stays.
+- The keystore lives in signing/ (see SIGNING below). Back it up.
+
+UPDATED TO THE CURRENT ANDROID
+- Now targets Android 17 (API level 37), the current Android release, and
+  compiles against SDK 37. Minimum is still Android 5.0 (API 21).
+- Game bundle rebuilt from the current source; gameplay is unchanged.
+
+IMPORTANT — ONE-TIME UNINSTALL
+------------------------------
+v1.0–v1.3 were signed with a debug key, and Android only installs an update
+when the signature matches. Installing v1.4 over v1.3 therefore says "App
+not installed". Uninstall the old copy once, install v1.4, and from then on
+every update installs in place.
 
 WHAT'S NEW IN v1.3
 ------------------
@@ -36,8 +57,8 @@ WHAT'S NEW IN v1.1
 
 INSTALL (sideload, ~2 minutes)
 ------------------------------
-0. If v1.0 was installed, it will update in place; if your phone
-   complains, uninstall the old copy first, then install this one.
+0. Coming from v1.3 or older: uninstall it first (one time only, see
+   above). Coming from v1.4 or later: just install, it updates in place.
 1. Copy TheLastJourney.apk onto your Android phone or tablet
    (USB, Bluetooth, cloud drive, or download it directly).
 2. Tap the APK file. If asked, allow "Install from unknown sources"
@@ -48,7 +69,42 @@ INSTALL (sideload, ~2 minutes)
 REQUIREMENTS
 ------------
 - Android 5.0 (Lollipop) or newer (ARM & x86, phones and tablets).
-- No internet permission, no ads, fully offline, ~100 KB.
+- Targets Android 17 (API 37), so it runs cleanly on current phones.
+- No internet permission, no ads, fully offline, ~95 KB.
+- Android 17 ignores orientation locks on large screens, so on tablets
+  and in desktop mode the window may be any shape; the game scales to fit.
+
+SIGNING (needed for every future build)
+---------------------------------------
+Files:
+  signing/thelastjourney-release.jks   the release keystore (alias: lastjourney)
+  signing/keystore.properties          its passwords, for apksigner
+
+Keep both files and never regenerate the keystore. A new key means a new
+signature, and everyone would have to uninstall again. Keep this repository
+private, and keep a backup of the .jks somewhere safe.
+
+After building and zipaligning a fresh APK (apksigner, Android build-tools 37):
+
+  apksigner sign \
+      --ks signing/thelastjourney-release.jks \
+      --ks-key-alias lastjourney \
+      --ks-pass file:<password-file> \
+      --key-pass file:<password-file> \
+      --v1-signing-enabled true --v2-signing-enabled true \
+      --v3-signing-enabled true \
+      --out TheLastJourney.apk app-aligned.apk
+
+The password file is simply the storePassword value from
+signing/keystore.properties, repeated on two lines (apksigner wants one
+line for the store and one for the key). Then check it:
+
+  apksigner verify --print-certs TheLastJourney.apk
+
+The certificate SHA-256 must stay:
+  32:7F:31:2B:E0:DE:A7:CB:80:50:99:17:31:24:42:BD:26:DE:BF:AE:99:13:02:32:73:C0:DC:72:EB:EE:6E:F6
+
+This build: versionName 1.4, versionCode 5, package com.zai.lastjourney.
 
 HOW TO PLAY ON TOUCH
 --------------------
@@ -72,12 +128,12 @@ P, M, R) — the desktop layout is untouched.
 
 TROUBLESHOOTING
 ---------------
-- Still a black screen after installing v1.1? Make sure you uninstalled
-  the old v1.0 copy first, then install again. If the message
-  "Could not start the game engine..." appears, update
+- "App not installed" coming from v1.3 or older: that is the signature
+  change — uninstall the old copy once, then install again. From v1.4 on,
+  updates install over the app without uninstalling.
+- Still a black screen? Make sure you uninstalled the old copy first, then
+  install again. If "Could not start the game engine..." appears, update
   "Android System WebView" in the Play Store and relaunch.
-- "App not installed": your Android version is below 5.0, or a previous
-  copy with a different signature exists — uninstall it first.
 - No sound on first launch: tap once anywhere; Android requires one
   interaction before audio can start.
 - If controls feel small on a tablet, they are always in the same
