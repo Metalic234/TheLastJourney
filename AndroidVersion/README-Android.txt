@@ -1,5 +1,17 @@
-THE LAST JOURNEY — Android Edition (v1.6)
+THE LAST JOURNEY — Android Edition (v1.7)
 ==========================================
+
+WHAT'S NEW IN v1.7
+------------------
+- FIXED: the game would not start on a phone. The title screen ignores
+  keyboard events because there is no keyboard, and it was waiting for a
+  touch that never arrived: the on-screen controls and the tap-to-start
+  handler in the Android shell both need the game input bridge, and the
+  current game source had stopped exposing it. Tapping anywhere now starts
+  the game, and the on-screen d-pad, jump, E, X, C, pause, mute and restart
+  buttons all drive the game again.
+- Same release key as v1.6, so it installs straight over it: versionName
+  1.7, versionCode 8.
 
 WHAT'S NEW IN v1.6
 ------------------

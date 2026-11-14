@@ -50,6 +50,33 @@ export class Input {
     window.addEventListener('blur', () => {
       this.downSet.clear();
     });
+
+    // Bridge for the on-screen touch controls shipped inside the Android
+    // WebView build (assets/www/touch.js). It waits for this object before
+    // drawing its buttons, so it has to exist for every Input instance.
+    window.__gameInput = {
+      set: (action, down) => this.setAction(action, down),
+      tapAny: () => this.tapAny(),
+    };
+  }
+
+  // Press or release an action from a pointer/button source. A press is
+  // edge-triggered like a key press, so held buttons keep reporting down().
+  setAction(action, down) {
+    if (down) {
+      if (!this.downSet.has(action)) this.pressedSet.add(action);
+      this.downSet.add(action);
+      this.anyPress = true;
+      this.anyPressAt = performance.now();
+    } else {
+      this.downSet.delete(action);
+    }
+  }
+
+  // A tap on the canvas: counts as "any key" for title and ending screens.
+  tapAny() {
+    this.anyPress = true;
+    this.anyPressAt = performance.now();
   }
 
   down(action) {
