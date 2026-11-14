@@ -193,7 +193,7 @@ export class Game {
     this.dolphins = [];
     this.dolphinBridgesDone = new Set();
     this.hintT = 0;
-    this.audio.applyBiome(this.level.theme);
+    this.audio.applyBiome(this.moodBiome());
     this.showCard(this.level);
     if (this.level.hostile) this.initWilds();
   }
@@ -216,10 +216,11 @@ export class Game {
     this.fadeTarget = 0;
     this.frozen = false;
     this.hintT = 0;
+    this.storyMetal = false;
     this.loadLevel(0);
     try {
       await this.audio.start();
-      this.audio.applyBiome(this.level.theme);
+      this.audio.applyBiome(this.moodBiome());
     } catch (e) {
       /* audio is optional */
     }
@@ -239,7 +240,7 @@ export class Game {
     this.fadeTarget = 0;
     this.frozen = false;
     this.loadLevel(index);
-    this.audio.applyBiome(this.level.theme);
+    this.audio.applyBiome(this.moodBiome());
     this.audio.play('transition');
   }
 
@@ -321,6 +322,7 @@ export class Game {
 
     if (this.input.consume('pause')) {
       this.paused = !this.paused;
+      this.audio.setBeam(false);
       this.audio.play('whisper');
     }
     if (this.paused) {
@@ -1184,11 +1186,9 @@ export class Game {
     if (this.input.consume('shard')) this.throwWhiteShards();
 
     const laserNow = this.input.down('laser');
-    if (laserNow && !battle.laserActive) {
-      battle.laserDamageT = 0;
-      this.audio.play('power');
-    }
+    if (laserNow && !battle.laserActive) battle.laserDamageT = 0;
     battle.laserActive = laserNow;
+    this.audio.setBeam(laserNow);
     if (laserNow) {
       battle.laserDamageT += dt;
       // The beam is on call in both phases; the knights never sit this one out.
@@ -1385,6 +1385,7 @@ export class Game {
     battle.finish = { t: 0, brown, stared: false, fired: false, gone: false, fade: 0 };
     battle.brownEngaged = false;
     battle.laserActive = false;
+    this.audio.setBeam(false);
     battle.shards.length = 0;
     this.player.facing = 1;
   }
@@ -1541,7 +1542,16 @@ export class Game {
     this.bossBattle = null;
     this.mode = 'play';
     this.player.facing = 1;
+    // Both of them are down: the story keeps its own score from here on.
+    this.storyMetal = true;
+    this.audio.setBeam(false);
+    this.audio.applyBiome('metal');
     this.beginTransition();
+  }
+
+  // Metal takes over the story once the two of them are down.
+  moodBiome() {
+    return this.storyMetal ? 'metal' : this.level.theme;
   }
 
   // Both of them are down. Before the water, the long way up, and the city below.
@@ -1550,6 +1560,8 @@ export class Game {
     this.bossBattle = null;
     this.mode = 'play';
     this.climbEpilogue = true;
+    this.storyMetal = true;
+    this.audio.applyBiome('metal');
     this.beginLookout();
     this.lookout.lines = [
       [0.6, 'SHE LEAVES THE LAST STREET AND CLIMBS UNTIL THE AIR THINS.'],
@@ -1871,6 +1883,7 @@ export class Game {
       || c.crabs.some((crab) => crab.alive)
       || (c.boss && c.boss.active && c.boss.alive)
     );
+    this.audio.setBeam(c.beamOn);
     if (c.beamOn) {
       c.beamTick += dt;
       while (c.beamTick >= 0.1) {
@@ -2271,6 +2284,7 @@ export class Game {
     b.active = false;
     c.bossDefeated = true;
     c.beamOn = false;
+    this.audio.setBeam(false);
     c.shards.length = 0;
     const giant = b.kind === 'giant';
     this.audio.play('blast');
@@ -2305,6 +2319,7 @@ export class Game {
 
   showWildsDown() {
     if (this.mode === 'ending') return;
+    this.audio.setBeam(false);
     this.combat = null;
     this.mode = 'ending';
     const deaths = {
@@ -2363,7 +2378,7 @@ export class Game {
     this.fade = 1;
     this.fadeTarget = 0;
     this.audio.play('transition');
-    this.audio.applyBiome(this.level.theme);
+    this.audio.applyBiome(this.moodBiome());
   }
 
   beginStoryEnding() {
@@ -2445,7 +2460,7 @@ export class Game {
     this.fade = 1;
     this.fadeTarget = 0;
     this.frozen = false;
-    this.audio.applyBiome(this.level.theme);
+    this.audio.applyBiome(this.moodBiome());
     this.audio.play('transition');
   }
 
@@ -2903,6 +2918,7 @@ export class Game {
     const battle = this.bossBattle;
     if (!battle || battle.ending) return;
     battle.ending = true;
+    this.audio.setBeam(false);
     this.mode = 'ending';
     this.ending = {
       name: 'THE LAST LIGHT',
@@ -3034,7 +3050,7 @@ export class Game {
     }
     this.fade = 0.85;
     this.fadeTarget = 0;
-    this.audio.applyBiome(this.level.theme);
+    this.audio.applyBiome(this.moodBiome());
   }
 
   drawLookout(g) {

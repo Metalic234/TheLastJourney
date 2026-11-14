@@ -195,6 +195,7 @@ export class AudioEngine {
     this.nextBell = 0;
     this.riffStep = 0;
     this.lastPlay = Object.create(null);
+    this.beam = null;
   }
 
   async start() {
@@ -814,9 +815,85 @@ export class AudioEngine {
     this.noiseHit(t, 320, 0.16, 0.02, 0.9, 'lowpass');
   }
 
+  // A ninja shuriken: a bright metallic ring, a second offset ring, and the
+  // air it cuts through as it leaves her hand.
   shardCast(t) {
-    this.sweep(t, 580, 1060, 0.16, 0.02, 'triangle');
-    this.noiseHit(t, 2600, 0.1, 0.01, 2);
+    this.noiseHit(t, 5600, 0.12, 0.016, 7, 'bandpass');
+    this.noiseHit(t, 2400, 0.2, 0.012, 2.6, 'bandpass');
+    this.bell(midi(96), t, 0.34, 0.02, false);
+    this.bell(midi(103), t + 0.035, 0.22, 0.012, false);
+    this.sweep(t + 0.02, 1200, 3200, 0.2, 0.01, 'triangle');
+  }
+
+  // A held lightsaber: two detuned saws through a resonant lowpass, ignited
+  // with a snap and a falling pitch, then humming until the button is let go.
+  setBeam(on) {
+    if (!this.ctx || this.ctx.state !== 'running') return;
+    const ctx = this.ctx;
+    const t = ctx.currentTime;
+    if (on) {
+      if (this.beam) return;
+      const g = ctx.createGain();
+      const filt = ctx.createBiquadFilter();
+      filt.type = 'lowpass';
+      filt.Q.value = 7;
+      const o1 = ctx.createOscillator();
+      o1.type = 'sawtooth';
+      o1.frequency.value = 92;
+      const o2 = ctx.createOscillator();
+      o2.type = 'sawtooth';
+      o2.frequency.value = 139;
+      o2.detune.value = 7;
+      const o3 = ctx.createOscillator();
+      o3.type = 'square';
+      o3.frequency.value = 46;
+      o1.connect(filt);
+      o2.connect(filt);
+      o3.connect(filt);
+      filt.connect(g);
+      g.connect(this.fx);
+      g.connect(this.delaySend);
+
+      // Ignition: the blade snaps out bright, then settles into the hum.
+      o1.frequency.setValueAtTime(150, t);
+      o1.frequency.exponentialRampToValueAtTime(92, t + 0.28);
+      o2.frequency.setValueAtTime(226, t);
+      o2.frequency.exponentialRampToValueAtTime(139, t + 0.28);
+      filt.frequency.setValueAtTime(3400, t);
+      filt.frequency.exponentialRampToValueAtTime(900, t + 0.34);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.linearRampToValueAtTime(0.055, t + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.03, t + 0.45);
+
+      const lfo = ctx.createOscillator();
+      lfo.frequency.value = 6.1;
+      const lfoGain = ctx.createGain();
+      lfoGain.gain.value = 3.4;
+      lfo.connect(lfoGain);
+      lfoGain.connect(o1.frequency);
+      lfoGain.connect(o2.frequency);
+
+      o1.start(t);
+      o2.start(t);
+      o3.start(t);
+      lfo.start(t);
+      this.noiseHit(t, 4200, 0.14, 0.022, 1.2, 'highpass');
+      this.beam = { g, filt, o1, o2, o3, lfo };
+      return;
+    }
+    const b = this.beam;
+    if (!b) return;
+    this.beam = null;
+    b.g.gain.cancelScheduledValues(t);
+    b.g.gain.setValueAtTime(0.03, t);
+    b.g.gain.exponentialRampToValueAtTime(0.0001, t + 0.22);
+    b.o1.frequency.exponentialRampToValueAtTime(46, t + 0.22);
+    b.o2.frequency.exponentialRampToValueAtTime(70, t + 0.22);
+    b.filt.frequency.exponentialRampToValueAtTime(260, t + 0.26);
+    for (const o of [b.o1, b.o2, b.o3, b.lfo]) {
+      try { o.stop(t + 0.3); } catch (e) { /* already stopped */ }
+    }
+    this.sweep(t, 240, 62, 0.26, 0.028, 'sine');
   }
 
   step(t) {

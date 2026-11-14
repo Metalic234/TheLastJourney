@@ -1,4 +1,4 @@
-THE LAST JOURNEY — Windows Edition (v1.5)
+THE LAST JOURNEY — Windows Edition (v1.6)
 =========================================
 
 A standalone Windows app: one .exe that opens the game in its own native
@@ -33,8 +33,10 @@ CONTROLS
 Click the window once if the keyboard seems unresponsive — that also
 satisfies Windows' rule that audio may only start after an interaction.
 
-What's included: the same game as Android v1.5 — all levels and biomes,
-the powers, both boss battles, the voyage and the ending.
+What's included: the same game as Android v1.6 — all levels and biomes,
+the powers, both boss battles, the voyage and the ending. The light beam
+ignites like a lightsaber, the shards ring like thrown shuriken, and the
+score turns to heavy metal once the two bosses are down.
 
 BUILDING IT YOURSELF
 --------------------

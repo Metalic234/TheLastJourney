@@ -1,5 +1,15 @@
-THE LAST JOURNEY — Android Edition (v1.5)
+THE LAST JOURNEY — Android Edition (v1.6)
 ==========================================
+
+WHAT'S NEW IN v1.6
+------------------
+- THE LIGHT BEAM NOW SOUNDS LIKE A LIGHTSABER: an ignition snap, a falling
+  pitch, then a steady humming blade that powers down when you let go.
+- THE WHITE SHARDS (X) NOW SOUND LIKE NINJA SHURIKEN: a bright metallic
+  ring and the air cutting past as they leave her hand.
+- AFTER THE BLUE AND BROWN BOSSES FALL, story mode switches to the heavy
+  metal score and stays there to the end.
+- Same release key as v1.5, so it installs straight over it.
 
 WHAT'S NEW IN v1.5
 ------------------
@@ -112,7 +122,7 @@ private, and keep a backup of the .jks somewhere safe. The script refuses
 to finish if the signing certificate is not the expected one:
   32:7F:31:2B:E0:DE:A7:CB:80:50:99:17:31:24:42:BD:26:DE:BF:AE:99:13:02:32:73:C0:DC:72:EB:EE:6E:F6
 
-This build: versionName 1.5, versionCode 6, package com.zai.lastjourney.
+This build: versionName 1.6, versionCode 7, package com.zai.lastjourney.
 
 HOW TO PLAY ON TOUCH
 --------------------
