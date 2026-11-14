@@ -1,5 +1,12 @@
-THE LAST JOURNEY — Android Edition (v1.4)
+THE LAST JOURNEY — Android Edition (v1.5)
 ==========================================
+
+WHAT'S NEW IN v1.5
+------------------
+- Rebuilt with the new one-command build script; gameplay, art and sound
+  are unchanged from v1.4.
+- Signed with the same release key, so it installs straight over v1.4.
+- versionName 1.5, versionCode 6.
 
 WHAT'S NEW IN v1.4
 ------------------
@@ -105,7 +112,7 @@ private, and keep a backup of the .jks somewhere safe. The script refuses
 to finish if the signing certificate is not the expected one:
   32:7F:31:2B:E0:DE:A7:CB:80:50:99:17:31:24:42:BD:26:DE:BF:AE:99:13:02:32:73:C0:DC:72:EB:EE:6E:F6
 
-This build: versionName 1.4, versionCode 5, package com.zai.lastjourney.
+This build: versionName 1.5, versionCode 6, package com.zai.lastjourney.
 
 HOW TO PLAY ON TOUCH
 --------------------
