@@ -74,34 +74,35 @@ REQUIREMENTS
 - Android 17 ignores orientation locks on large screens, so on tablets
   and in desktop mode the window may be any shape; the game scales to fit.
 
-SIGNING (needed for every future build)
----------------------------------------
+BUILDING A NEW APK (scripted)
+-----------------------------
+build-apk.sh does the whole release in one command:
+
+  cd AndroidVersion
+  ./build-apk.sh                 # keep the version name, versionCode + 1
+  ./build-apk.sh -n 1.5 -c 7     # set the version explicitly
+
+It bundles src/ with esbuild, rebuilds the APK with apktool, aligns it,
+signs it with the release keystore, checks the certificate and writes
+AndroidVersion/TheLastJourney.apk. Use -o <file> to write the result
+somewhere else, or -t <file> to build from a different base APK.
+
+It needs JDK 17+, Android build-tools with apksigner and zipalign (37.x),
+apktool, and Node with esbuild. If they are not on PATH, point at them:
+
+  APKTOOL_JAR=/path/to/apktool.jar \
+  ANDROID_HOME=/path/to/android-sdk \
+  ESBUILD=/path/to/esbuild \
+  ./build-apk.sh
+
 Files:
-  signing/thelastjourney-release.jks   the release keystore (alias: lastjourney)
-  signing/keystore.properties          its passwords, for apksigner
+  signing/thelastjourney-release.jks   release keystore (alias: lastjourney)
+  signing/keystore.properties          its passwords, read by the script
 
-Keep both files and never regenerate the keystore. A new key means a new
+Keep both and never regenerate the keystore: a new key means a new
 signature, and everyone would have to uninstall again. Keep this repository
-private, and keep a backup of the .jks somewhere safe.
-
-After building and zipaligning a fresh APK (apksigner, Android build-tools 37):
-
-  apksigner sign \
-      --ks signing/thelastjourney-release.jks \
-      --ks-key-alias lastjourney \
-      --ks-pass file:<password-file> \
-      --key-pass file:<password-file> \
-      --v1-signing-enabled true --v2-signing-enabled true \
-      --v3-signing-enabled true \
-      --out TheLastJourney.apk app-aligned.apk
-
-The password file is simply the storePassword value from
-signing/keystore.properties, repeated on two lines (apksigner wants one
-line for the store and one for the key). Then check it:
-
-  apksigner verify --print-certs TheLastJourney.apk
-
-The certificate SHA-256 must stay:
+private, and keep a backup of the .jks somewhere safe. The script refuses
+to finish if the signing certificate is not the expected one:
   32:7F:31:2B:E0:DE:A7:CB:80:50:99:17:31:24:42:BD:26:DE:BF:AE:99:13:02:32:73:C0:DC:72:EB:EE:6E:F6
 
 This build: versionName 1.4, versionCode 5, package com.zai.lastjourney.
