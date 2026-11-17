@@ -23,6 +23,25 @@ CONTROLS
   Collect all four memories on a road, then reach its end to continue.
   Falling into a gap costs the whole run of that road.
 
+THE MEMORY PEDDLER
+------------------
+At the end of every road a stall opens before the next one: the peddler
+sells power and takes memories, so what she carries into the next road is
+her choice. The pocket edition has no bosses, so the stall stands in for
+the boss gate of the bigger versions.
+
+  LEFT / RIGHT   choose a ware
+  C              buy the chosen ware (memories are spent, not borrowed)
+  X              leave the stall and take the next road
+
+  EXTRA HEART    2 memories   one more heart, up to five, and she is mended
+  SWIFT BOOTS    1 memory     she runs faster on every road after this
+  LONG SHARDS    1 memory     her shards carry further before they fall
+  LEAVE THE STALL             walk on
+
+Memories are a purse: each road's four pickups add to it, and only the
+stall spends it.
+
 HARDWARE
 --------
   - ESP32 dev board (classic ESP32 or ESP32-S3 both work; PSRAM helps)

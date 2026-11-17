@@ -8,6 +8,7 @@ import { GIRL, GIRL_SIT, drawGuardian, drawWisp, drawTeen, drawShield, drawDog, 
 import { buildLevel, buildCityScene, groundAt, TOTAL_MEMORIES, LEVEL_COUNT } from './levels.js';
 import { AudioEngine } from './audio.js';
 import { Input } from './input.js';
+import { SHOP_ITEMS, drawShopOverlay } from './shop.js';
 
 const SPEED = 78;
 const GRAV = 330;
@@ -104,6 +105,10 @@ export class Game {
     this.powers = new Set();
     this.memory = 0;
     this.nearPower = null;
+    this.bought = new Map();
+    this.shop = null;
+    this.shopNear = false;
+    this.shopGiven = false;
     this.dashT = 0;
     this.dashCd = 0;
     this.memorySurge = null;
@@ -179,6 +184,8 @@ export class Game {
     this.particles.length = 0;
     this.nearby = null;
     this.nearPower = null;
+    this.shop = null;
+    this.shopNear = false;
     this.finale = null;
     this.bossBattle = null;
     this.dashT = 0;
@@ -206,6 +213,10 @@ export class Game {
     this.found.clear();
     this.powers.clear();
     this.memory = 0;
+    this.bought.clear();
+    this.shop = null;
+    this.shopNear = false;
+    this.shopGiven = false;
     this.mode = 'play';
     this.ending = null;
     this.finale = null;
@@ -316,6 +327,13 @@ export class Game {
 
     if (this.voyage) {
       this.updateVoyage(dt);
+      this.updateParticles(dt);
+      return;
+    }
+
+    // An open shop window owns the frame: no pause, no walking, no fighting.
+    if (this.shop && this.shop.open) {
+      this.updateShop(dt);
       this.updateParticles(dt);
       return;
     }
@@ -475,7 +493,7 @@ export class Game {
       this.dashT -= dt;
       p.vx = p.facing * DASH_SPEED;
     } else {
-      p.vx = damp(p.vx, move * SPEED, 13, dt);
+      p.vx = damp(p.vx, move * SPEED * (1 + 0.14 * this.upgradeCount('boots')), 13, dt);
     }
 
     const nx = p.x + p.vx * dt;
@@ -636,6 +654,17 @@ export class Game {
     const pw = this.level.power;
     this.nearPower = pw && !this.powers.has(pw.id) && Math.abs(pw.x - p.x) < 32 ? pw : null;
 
+    // the peddler's stall: walk up to it and the window opens
+    if (this.shop && !this.shop.open) {
+      this.shopNear = Math.abs(this.shop.x - p.x) < 34;
+      if (this.shopNear && this.input.consume('interact')) {
+        this.openShopMenu();
+        return;
+      }
+    } else {
+      this.shopNear = false;
+    }
+
     if (best) {
       if (this.input.consume('interact')) this.collect(best);
       return;
@@ -702,6 +731,168 @@ export class Game {
         max: 0.8 + Math.random() * 1.2,
         grav: 14,
         drag: 0.97,
+      });
+    }
+  }
+
+  // ---------------------------------------------------------------- shop
+  // One stall waits at the end of a road that had a boss on it. She walks up
+  // to it and the peddler opens his window: memories in, power out.
+  openStall(x) {
+    const gx = clamp(x, 70, this.level.width - 70);
+    this.shop = {
+      x: gx,
+      y: groundAt(this.level, gx),
+      open: false,
+      index: 0,
+      t: 0,
+      notice: null,
+    };
+    this.shopNear = false;
+    this.audio.play('whisper');
+  }
+
+  openShopMenu() {
+    if (!this.shop) return;
+    this.shop.open = true;
+    this.shop.index = 0;
+    this.shop.notice = null;
+    this.audio.play('power');
+  }
+
+  closeShop() {
+    if (!this.shop) return;
+    this.shop.open = false;
+    this.shopNear = false;
+    this.audio.play('whisper');
+  }
+
+  upgradeCount(id) {
+    return this.bought.get(id) || 0;
+  }
+
+  updateShop(dt) {
+    const s = this.shop;
+    if (!s) return;
+    s.t += dt;
+    if (s.notice) {
+      s.notice.t -= dt;
+      if (s.notice.t <= 0) s.notice = null;
+    }
+    const rows = SHOP_ITEMS.length + 1;
+    if (this.input.pressed('left') || this.input.pressed('up')) {
+      s.index = (s.index + rows - 1) % rows;
+      this.audio.play('step');
+    }
+    if (this.input.pressed('right') || this.input.pressed('down')) {
+      s.index = (s.index + 1) % rows;
+      this.audio.play('step');
+    }
+    if (this.input.consume('interact')) this.buySelected();
+    else if (this.input.consume('pause')) this.closeShop();
+  }
+
+  buySelected() {
+    const s = this.shop;
+    if (!s) return;
+    if (s.index >= SHOP_ITEMS.length) {
+      this.closeShop();
+      return;
+    }
+    const item = SHOP_ITEMS[s.index];
+    const owned = this.upgradeCount(item.id);
+    if (owned >= item.max) {
+      s.notice = { text: 'THAT ONE IS ALREADY HERS.', t: 1.8, color: '#8a8296' };
+      this.audio.play('whisper');
+      return;
+    }
+    if (this.memory < item.cost) {
+      s.notice = { text: 'SHE HAS NO MEMORY LEFT TO GIVE.', t: 1.8, color: '#8a8296' };
+      this.audio.play('whisper');
+      return;
+    }
+    this.memory -= item.cost;
+    this.bought.set(item.id, owned + 1);
+    this.applyUpgrade(item.id);
+    this.audio.play('memory');
+    s.notice = { text: item.bought || 'IT IS HERS.', t: 2.2, color: item.color };
+    const p = this.player;
+    for (let i = 0; i < 26; i++) {
+      const a = Math.random() * TAU;
+      const sp = 16 + Math.random() * 48;
+      this.spawn({
+        type: 'spark',
+        x: p.x,
+        y: p.y - 14,
+        vx: Math.cos(a) * sp,
+        vy: Math.sin(a) * sp - 12,
+        size: 1,
+        color: i % 3 ? item.color : '#ffffff',
+        max: 0.6 + Math.random() * 0.7,
+        grav: 24,
+        drag: 0.96,
+      });
+    }
+  }
+
+  applyUpgrade(id) {
+    if (id !== 'heart') return;
+    // A bought heart is a real bar of life, in whichever fight is running.
+    if (this.combat) {
+      this.combat.max += 25;
+      this.combat.hp = this.combat.max;
+    }
+    if (this.bossBattle) {
+      this.bossBattle.hero.max += 25;
+      this.bossBattle.hero.hp = this.bossBattle.hero.max;
+    }
+  }
+
+  drawStall(g) {
+    const s = this.shop;
+    if (!s) return;
+    const sx = Math.round(s.x - this.cam.x);
+    if (sx < -60 || sx > W + 60) return;
+    const baseY = Math.round(s.y);
+    const bob = Math.sin(this.time * 1.6);
+
+    g.save();
+    // awning: faded stripes on two poles
+    for (let i = 0; i < 8; i++) {
+      g.fillStyle = i % 2 ? '#8d3a4a' : '#e8dcc8';
+      g.fillRect(sx - 23 + i * 6, baseY - 38, 6, 9);
+    }
+    g.fillStyle = '#1c1424';
+    g.fillRect(sx - 24, baseY - 40, 48, 2);
+    g.fillRect(sx - 21, baseY - 30, 2, 30);
+    g.fillRect(sx + 19, baseY - 30, 2, 30);
+    // the counter and the goods on it
+    g.fillStyle = '#3a2c44';
+    g.fillRect(sx - 21, baseY - 17, 42, 17);
+    g.fillStyle = '#241a2c';
+    g.fillRect(sx - 21, baseY - 17, 42, 2);
+    g.fillStyle = '#cfeaff';
+    g.fillRect(sx - 12, baseY - 21, 3, 3);
+    g.fillStyle = '#ff8a9a';
+    g.fillRect(sx - 2, baseY - 21, 3, 3);
+    g.fillStyle = '#ffd166';
+    g.fillRect(sx + 8, baseY - 21, 3, 3);
+    // lantern
+    g.fillStyle = '#ffcf8e';
+    g.fillRect(sx - 17, baseY - 27 + Math.round(bob), 2, 2);
+    g.save();
+    g.globalCompositeOperation = 'lighter';
+    glow(g, sx - 16, baseY - 26, 18, '#ffb066', 0.2 + bob * 0.03);
+    g.restore();
+    g.restore();
+
+    if (!s.open && this.shopNear) {
+      const pulse = 0.65 + Math.sin(this.time * 4) * 0.35;
+      const label = 'E  MEMORY PEDDLER';
+      const halfW = textWidth(label, 1, 1) / 2;
+      const lx = clamp(sx, halfW + 6, W - halfW - 6);
+      drawText(g, label, lx, baseY - 50, {
+        align: 'center', color: rgba('#ffffff', pulse), scale: 1, shadow: '#000000',
       });
     }
   }
@@ -934,7 +1125,7 @@ export class Game {
         slamPending: false,
         stompT: 0,
       })),
-      hero: { hp: 100, max: 100, hurt: 0 },
+      hero: { hp: 100 + 25 * this.upgradeCount('heart'), max: 100 + 25 * this.upgradeCount('heart'), hurt: 0 },
       heroDown: false,
       shards: [],
       blueShards: [],
@@ -1217,7 +1408,7 @@ export class Game {
       shard.x += shard.vx * dt;
       shard.y += shard.vy * dt;
       if (Math.hypot(dx, dy) < 12) {
-        this.damageBoss(target, 1, shard.x, shard.y);
+        this.damageBoss(target, 1 + this.upgradeCount('shard'), shard.x, shard.y);
         continue;
       }
       survivors.push(shard);
@@ -1320,7 +1511,7 @@ export class Game {
     const beamY = groundAt(this.level, this.player.x) - 40;
     const bossY = groundAt(this.level, target.x) - 22;
     if (Math.abs(bossY - beamY) <= 44) {
-      this.damageBoss(target, 6, target.x - 8, bossY);
+      this.damageBoss(target, 6 + 3 * this.upgradeCount('beam'), target.x - 8, bossY);
     }
   }
 
@@ -1546,6 +1737,15 @@ export class Game {
     this.storyMetal = true;
     this.audio.setBeam(false);
     this.audio.applyBiome('metal');
+    // The street is done, so the peddler sets up on the way out. She walks to
+    // his stall if she wants to, then walks on to the water.
+    if (!this.shopGiven) {
+      this.shopGiven = true;
+      this.level.arenaX = null;
+      this.level.teens = [];
+      this.openStall(this.player.x + 108);
+      return;
+    }
     this.beginTransition();
   }
 
@@ -1675,8 +1875,8 @@ export class Game {
       stomp: 0,
     } : null;
     this.combat = {
-      hp: 100,
-      max: 100,
+      hp: 100 + 25 * this.upgradeCount('heart'),
+      max: 100 + 25 * this.upgradeCount('heart'),
       hurt: 0,
       invuln: 0,
       dogs,
@@ -1908,7 +2108,7 @@ export class Game {
       shard.x += shard.vx * dt;
       shard.y += shard.vy * dt;
       if (Math.hypot(target.x - shard.x, ty - shard.y) < 15) {
-        this.damageWilds(target, 1, shard.x, shard.y);
+        this.damageWilds(target, 1 + this.upgradeCount('shard'), shard.x, shard.y);
         continue;
       }
       keep.push(shard);
@@ -2183,28 +2383,28 @@ export class Game {
       if (!dog.alive) continue;
       const ahead = (dog.x - p.x) * dir;
       if (ahead > -10 && ahead < 430 && Math.abs(groundAt(L, dog.x) - 22 - beamY) < 58) {
-        this.damageWilds(dog, 6, dog.x, groundAt(L, dog.x) - 9);
+        this.damageWilds(dog, 6 + 3 * this.upgradeCount('beam'), dog.x, groundAt(L, dog.x) - 9);
       }
     }
     for (const spider of c.spiders) {
       if (!spider.alive) continue;
       const ahead = (spider.x - p.x) * dir;
       if (ahead > -10 && ahead < 430 && Math.abs(groundAt(L, spider.x) - 17 - beamY) < 58) {
-        this.damageWilds(spider, 6, spider.x, groundAt(L, spider.x) - 15);
+        this.damageWilds(spider, 6 + 3 * this.upgradeCount('beam'), spider.x, groundAt(L, spider.x) - 15);
       }
     }
     for (const crab of c.crabs) {
       if (!crab.alive) continue;
       const ahead = (crab.x - p.x) * dir;
       if (ahead > -10 && ahead < 430 && Math.abs(groundAt(L, crab.x) - 12 - beamY) < 58) {
-        this.damageWilds(crab, 6, crab.x, groundAt(L, crab.x) - 10);
+        this.damageWilds(crab, 6 + 3 * this.upgradeCount('beam'), crab.x, groundAt(L, crab.x) - 10);
       }
     }
     if (c.boss && c.boss.active && c.boss.alive) {
       const ahead = (c.boss.x - p.x) * dir;
       const bossH = c.boss.kind === 'giant' ? 48 : 32;
       if (ahead > -10 && ahead < 540 && Math.abs(groundAt(L, c.boss.x) - bossH - beamY) < 76) {
-        this.damageWilds(c.boss, 3, c.boss.x - 12, groundAt(L, c.boss.x) - bossH);
+        this.damageWilds(c.boss, 3 + 2 * this.upgradeCount('beam'), c.boss.x - 12, groundAt(L, c.boss.x) - bossH);
       }
     }
   }
@@ -2315,6 +2515,8 @@ export class Game {
       t: 0,
       typed: 0,
     };
+    // The boss is down. The peddler sets up in the space behind her.
+    this.openStall(this.player.x - 96);
   }
 
   showWildsDown() {
@@ -3487,6 +3689,7 @@ export class Game {
       return;
     }
     if (this.combat) this.drawWildsBack(g);
+    this.drawStall(g);
     // the four, standing at the end of the last street, before she reaches them
     if (this.level.teens) {
       for (const teen of this.level.teens) {
@@ -4724,6 +4927,7 @@ export class Game {
     }
     if (this.mode === 'title') this.drawTitle(g);
     if (this.note) this.drawNote(g);
+    if (this.shop && this.shop.open) drawShopOverlay(g, this);
     if (this.paused) this.drawPause(g);
   }
 

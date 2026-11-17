@@ -40,9 +40,24 @@ int main(int argc, char **argv) {
   int f;
 
   game_init();
-  for (f = 0; f < 3000; f++) {
+  int shop_frames = 0;
+  int shop_shots = 0;
+  for (f = 0; f < 6000; f++) {
     GameInput in;
     memset(&in, 0, sizeof(in));
+
+    if (game_state() == 4) {
+      /* the peddler: buy for a while, then take the road */
+      shop_frames++;
+      if (shop_frames == 2) { write_ppm(dir, f); printf("shop window at frame %d (purse %d)\n", f, game_purse()); }
+      in.action = (shop_frames % 6) == 0;
+      in.right = (shop_frames % 30) == 0;
+      if (shop_frames > 90 && (shop_frames % 2) == 0) in.jump = 1;
+      game_update(dt, in);
+      continue;
+    }
+    if (shop_frames) { shop_shots++; shop_frames = 0; }
+
     in.right = 1;
     /* jump when a pit is just ahead, otherwise hop now and then */
     if (game_ground_at(game_player_x() + 20.0f) > 300.0f && (f % 2) == 0) in.jump = 1;
@@ -56,7 +71,8 @@ int main(int argc, char **argv) {
       break;
     }
   }
-  printf("stage=%d hp=%d memories=%d/%d finished=%d\n",
-         game_stage(), game_hp(), game_memories(), game_total_memories(), game_finished());
+  printf("stage=%d hp=%d/%d purse=%d memories=%d/%d shops=%d finished=%d\n",
+         game_stage(), game_hp(), game_max_hp(), game_purse(), game_memories(),
+         game_total_memories(), shop_shots, game_finished());
   return 0;
 }

@@ -100,10 +100,29 @@ static int mem_n, mem_taken;
 static Shard shards[MAX_SHARDS];
 
 static float cam;
-static int state; /* 0 play, 1 clear, 2 dead, 3 end */
+static int state; /* 0 play, 1 clear, 2 dead, 3 end, 4 shop */
 static float state_t;
 static float banner;
 static int finished;
+
+/* ---- the memory peddler ------------------------------------------------ */
+/* Memories are the purse: they add up across the run and the stall spends
+ * them. The three wares are small, permanent and paid for once. */
+#define SHOP_ROWS 4
+static int purse;
+static int max_hp = 3;
+static int shop_sel;
+static int boots;
+static int long_shards;
+static float shop_t;
+
+static const char *SHOP_NAME[3] = { "EXTRA HEART", "SWIFT BOOTS", "LONG SHARDS" };
+static const int SHOP_COST[3] = { 2, 1, 1 };
+static const char *SHOP_DESC[3] = {
+  "ONE MORE BEAT IN HER CHEST. SHE IS MENDED.",
+  "SHE RUNS A LITTLE FASTER ON EVERY ROAD.",
+  "HER SHARDS CARRY FURTHER BEFORE THEY FALL.",
+};
 
 /* ---- helpers ----------------------------------------------------------- */
 static float clampf(float v, float a, float b) {
@@ -276,7 +295,7 @@ static void reset_stage(int idx) {
   p.vy = 0;
   p.on_ground = 1;
   p.facing = 1;
-  p.hp = 3;
+  p.hp = max_hp;
   p.invuln = 0;
   p.shoot_cd = 0;
   p.anim = 0;
@@ -317,6 +336,11 @@ static void reset_stage(int idx) {
 
 void game_init(void) {
   finished = 0;
+  purse = 0;
+  max_hp = 3;
+  boots = 0;
+  long_shards = 0;
+  shop_sel = 0;
   memset(fb, 0, sizeof(fb));
   reset_stage(0);
 }
@@ -345,10 +369,47 @@ static void shoot(void) {
       shards[i].x = p.x + p.facing * 7;
       shards[i].y = p.y - 11;
       shards[i].vx = p.facing * 250.0f;
-      shards[i].life = 1.3f;
+      shards[i].life = long_shards ? 2.2f : 1.3f;
       shards[i].live = 1;
       p.shoot_cd = 0.28f;
       return;
+    }
+  }
+}
+
+static void reset_stage(int idx);
+
+static void leave_shop(void) {
+  if (stage_i < 2) {
+    reset_stage(stage_i + 1);
+  } else {
+    state = 3;
+    finished = 1;
+  }
+}
+
+static void update_shop(int left_pressed, int right_pressed, int jump_pressed, int action_pressed) {
+  if (left_pressed) shop_sel = (shop_sel + SHOP_ROWS - 1) % SHOP_ROWS;
+  if (right_pressed) shop_sel = (shop_sel + 1) % SHOP_ROWS;
+  if (jump_pressed) { leave_shop(); return; }
+  if (!action_pressed) return;
+
+  if (shop_sel >= 3) { leave_shop(); return; }
+  if (shop_sel == 0) {
+    if (max_hp < 5 && purse >= SHOP_COST[0]) {
+      purse -= SHOP_COST[0];
+      max_hp++;
+      p.hp = max_hp;
+    }
+  } else if (shop_sel == 1) {
+    if (!boots && purse >= SHOP_COST[1]) {
+      purse -= SHOP_COST[1];
+      boots = 1;
+    }
+  } else if (shop_sel == 2) {
+    if (!long_shards && purse >= SHOP_COST[2]) {
+      purse -= SHOP_COST[2];
+      long_shards = 1;
     }
   }
 }
@@ -359,7 +420,7 @@ static void update_play(float dt, GameInput in, int jump_pressed, int action_pre
   int i;
 
   if (dir != 0) p.facing = dir;
-  p.vx += (dir * 74.0f - p.vx) * clampf(dt * 9.0f, 0.0f, 1.0f);
+  p.vx += (dir * (boots ? 88.0f : 74.0f) - p.vx) * clampf(dt * 9.0f, 0.0f, 1.0f);
   if (jump_pressed && p.on_ground) {
     p.vy = -184.0f;
     p.on_ground = 0;
@@ -429,6 +490,7 @@ static void update_play(float dt, GameInput in, int jump_pressed, int action_pre
         && p.y > mems[i].y - 2 && p.y < mems[i].y + 18) {
       mems[i].taken = 1;
       mem_taken++;
+      purse++;
     }
   }
 
@@ -531,7 +593,7 @@ static void draw_hud(void) {
   char buf[16];
   int i;
 
-  for (i = 0; i < 3; i++) {
+  for (i = 0; i < max_hp && i < 5; i++) {
     uint16_t c = i < p.hp ? to565(0xE05050) : to565(0x402028);
     int hx = 6 + i * 7;
     px(hx, 6, c);
@@ -568,11 +630,97 @@ static void draw_hud(void) {
   }
 }
 
+
+/* ---- the peddler's window ---------------------------------------------- */
+static void mem_str(char *b, int n) {
+  int i = 0;
+  b[i++] = 'M'; b[i++] = 'E'; b[i++] = 'M'; b[i++] = ' ';
+  if (n >= 100) b[i++] = (char)('0' + (n / 100) % 10);
+  if (n >= 10) b[i++] = (char)('0' + (n / 10) % 10);
+  b[i++] = (char)('0' + (n % 10));
+  b[i] = 0;
+}
+
+static void cost_str(char *b, int cost) {
+  int i = 0;
+  b[i++] = (char)('0' + (cost % 10));
+  b[i++] = ' ';
+  b[i++] = 'M'; b[i++] = 'E'; b[i++] = 'M';
+  b[i] = 0;
+}
+
+static void draw_shop(void) {
+  char buf[16];
+  int i, y;
+
+  /* dim the road behind the window */
+  for (i = 0; i < H; i++) {
+    uint16_t *row = &fb[i * W];
+    int x;
+    for (x = 0; x < W; x++) {
+      uint16_t c = row[x];
+      int r = (c >> 11) & 0x1F, g = (c >> 5) & 0x3F, b = c & 0x1F;
+      row[x] = (uint16_t)(((r >> 1) << 11) | ((g >> 1) << 5) | (b >> 1));
+    }
+  }
+
+  rect(38, 22, W - 76, H - 44, to565(0x161220));
+  rect(38, 22, W - 76, 1, to565(0x8E7FB0));
+  rect(38, H - 23, W - 76, 1, to565(0x8E7FB0));
+  rect(38, 22, 1, H - 44, to565(0x8E7FB0));
+  rect(W - 39, 22, 1, H - 44, to565(0x8E7FB0));
+
+  text_center("THE MEMORY PEDDLER", 30, 1, to565(0xF0E8F8));
+  mem_str(buf, purse);
+  text(buf, W - 44 - text_w(buf, 1), 40, 1, to565(0xD8C9A8));
+
+  for (i = 0; i < SHOP_ROWS; i++) {
+    int owned = 0;
+    const char *label;
+    y = 56 + i * 16;
+    if (i == shop_sel) {
+      rect(46, y - 3, W - 92, 13, to565(0x2A2140));
+      px(48, y + 1, to565(0xFFD9A0));
+      px(48, y + 2, to565(0xFFD9A0));
+      px(49, y + 2, to565(0xFFD9A0));
+      px(48, y + 3, to565(0xFFD9A0));
+    }
+    if (i == 3) {
+      text("LEAVE THE STALL", 56, y, 1, shop_sel == 3 ? to565(0xFFFFFF) : to565(0xB9B2C8));
+      text("WALK ON", W - 84, y, 1, to565(0x8A8296));
+      continue;
+    }
+    label = SHOP_NAME[i];
+    if (i == 0) owned = max_hp >= 5;
+    else if (i == 1) owned = boots;
+    else owned = long_shards;
+
+    if (owned) {
+      text(label, 56, y, 1, to565(0x6B6478));
+      text("OWNED", W - 84, y, 1, to565(0x6B6478));
+      continue;
+    }
+    text(label, 56, y, 1, purse >= SHOP_COST[i] ? to565(0xF6E2C0) : to565(0x8A8296));
+    cost_str(buf, SHOP_COST[i]);
+    text(buf, W - 44 - text_w(buf, 1), y, 1,
+         purse >= SHOP_COST[i] ? to565(0xFFD9A0) : to565(0x8A8296));
+  }
+
+  if (shop_sel < 3) text_center(SHOP_DESC[shop_sel], 128, 1, to565(0xC9C1D6));
+  else text_center("SHE TAKES HER MEMORIES WITH HER.", 128, 1, to565(0xC9C1D6));
+
+  if (shop_t > 0.25f) {
+    text_center("LEFT RIGHT CHOOSE   C BUY   X GO", H - 34, 1, to565(0x8D869F));
+  }
+}
+
 /* ---- public API -------------------------------------------------------- */
 void game_update(float dt, GameInput in) {
   static GameInput prev;
   int jump_pressed = in.jump && !prev.jump;
   int action_pressed = in.action && !prev.action;
+  int left_pressed = in.left && !prev.left;
+  int right_pressed = in.right && !prev.right;
   prev = in;
 
   if (dt <= 0) dt = 0.016f;
@@ -582,9 +730,14 @@ void game_update(float dt, GameInput in) {
   if (state == 1) {
     state_t -= dt;
     if (state_t <= 0) {
-      if (stage_i < 2) reset_stage(stage_i + 1);
+      /* A road that ends in a boss ends at the peddler: the shop opens
+       * before the next road instead of cutting straight to it. */
+      if (stage_i < 2) { state = 4; shop_sel = 0; shop_t = 0.0f; }
       else { state = 3; finished = 1; }
     }
+  } else if (state == 4) {
+    shop_t += dt;
+    update_shop(left_pressed, right_pressed, jump_pressed, action_pressed);
   } else if (state == 2) {
     state_t -= dt;
     if (state_t <= 0) reset_stage(stage_i);
@@ -596,6 +749,7 @@ void game_update(float dt, GameInput in) {
 
   draw_world();
   draw_hud();
+  if (state == 4) draw_shop();
 }
 
 const uint16_t *game_framebuffer(void) { return fb; }
@@ -604,6 +758,9 @@ int game_hp(void) { return p.hp; }
 int game_memories(void) { return mem_taken; }
 int game_total_memories(void) { return mem_n; }
 int game_finished(void) { return finished; }
+int game_state(void) { return state; }
+int game_purse(void) { return purse; }
+int game_max_hp(void) { return max_hp; }
 
 /* Extras for host tools and tests. */
 float game_ground_at(float x) { return ground_y(x); }

@@ -1,5 +1,19 @@
-THE LAST JOURNEY — Android Edition (v1.7)
+THE LAST JOURNEY — Android Edition (v1.8)
 ==========================================
+
+WHAT'S NEW IN v1.8
+------------------
+- THE MEMORY PEDDLER: a road that ends in a boss now ends at a stall
+  instead of cutting straight to the next road. Walk up to it and the
+  window opens. Memories are the currency, so the choice is real: buy
+  power now, or keep the memory for later.
+  Wares: A SPARE HEART (2 memories), SHARD EDGE (1), KNIGHTS' FOCUS (2),
+  QUICK BOOTS (1). Each has its own limit, and everything carries to the
+  end of the run.
+  On a phone: the d-pad left/right chooses, E buys, the pause button
+  closes the window.
+- Same release key as v1.7, so it installs straight over it: versionName
+  1.8, versionCode 9.
 
 WHAT'S NEW IN v1.7
 ------------------

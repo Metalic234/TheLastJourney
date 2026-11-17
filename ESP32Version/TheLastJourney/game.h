@@ -31,6 +31,9 @@ int game_hp(void);
 int game_memories(void);
 int game_total_memories(void);
 int game_finished(void);
+int game_state(void);
+int game_purse(void);
+int game_max_hp(void);
 
 /* Extras for host tools and tests. */
 float game_ground_at(float x);

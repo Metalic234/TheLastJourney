@@ -1,8 +1,16 @@
-THE LAST JOURNEY — Windows Edition (v1.6)
+THE LAST JOURNEY — Windows Edition (v1.8)
 =========================================
 
 A standalone Windows app: one .exe that opens the game in its own native
 window. No browser, no address bar, no internet connection, no install.
+
+WHAT'S NEW IN v1.8
+------------------
+- THE MEMORY PEDDLER: after every road that ends in a boss, a stall waits
+  on the way out. Walk up to it and the window opens: memories in, power
+  out. A/D chooses, E buys, Esc closes.
+  Wares: A SPARE HEART, SHARD EDGE, KNIGHTS' FOCUS, QUICK BOOTS.
+- Same game as the web and Android builds.
 
 PLAY
 ----
