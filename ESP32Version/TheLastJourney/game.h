@@ -34,6 +34,8 @@ int game_finished(void);
 int game_state(void);
 int game_purse(void);
 int game_max_hp(void);
+int game_auto_kill(void);
+int game_bots_killed(void);
 
 /* Extras for host tools and tests. */
 float game_ground_at(float x);

@@ -11,6 +11,7 @@
 
 #include "game.h"
 #include <math.h>
+#include <stdlib.h>
 #include <string.h>
 
 #define W GAME_W
@@ -108,20 +109,24 @@ static int finished;
 /* ---- the memory peddler ------------------------------------------------ */
 /* Memories are the purse: they add up across the run and the stall spends
  * them. The three wares are small, permanent and paid for once. */
-#define SHOP_ROWS 4
+#define SHOP_ROWS 5
 static int purse;
 static int max_hp = 3;
 static int shop_sel;
 static int boots;
 static int long_shards;
+static int auto_kill;
+static int bots_killed;
 static float shop_t;
+static float zap_t, zap_x, zap_cd;
 
-static const char *SHOP_NAME[3] = { "EXTRA HEART", "SWIFT BOOTS", "LONG SHARDS" };
-static const int SHOP_COST[3] = { 2, 1, 1 };
-static const char *SHOP_DESC[3] = {
+static const char *SHOP_NAME[4] = { "EXTRA HEART", "SWIFT BOOTS", "LONG SHARDS", "AUTOMATIC BOT KILLER" };
+static const int SHOP_COST[4] = { 2, 1, 1, 2 };
+static const char *SHOP_DESC[4] = {
   "ONE MORE BEAT IN HER CHEST. SHE IS MENDED.",
   "SHE RUNS A LITTLE FASTER ON EVERY ROAD.",
   "HER SHARDS CARRY FURTHER BEFORE THEY FALL.",
+  "TWO SHADOWS KILL NEARBY BOTS. NEVER A BOSS.",
 };
 
 /* ---- helpers ----------------------------------------------------------- */
@@ -299,6 +304,8 @@ static void reset_stage(int idx) {
   p.invuln = 0;
   p.shoot_cd = 0;
   p.anim = 0;
+  zap_t = 0.0f;
+  zap_cd = 0.0f;
 
   mem_n = MAX_MEM;
   mem_taken = 0;
@@ -340,6 +347,8 @@ void game_init(void) {
   max_hp = 3;
   boots = 0;
   long_shards = 0;
+  auto_kill = 0;
+  bots_killed = 0;
   shop_sel = 0;
   memset(fb, 0, sizeof(fb));
   reset_stage(0);
@@ -394,7 +403,7 @@ static void update_shop(int left_pressed, int right_pressed, int jump_pressed, i
   if (jump_pressed) { leave_shop(); return; }
   if (!action_pressed) return;
 
-  if (shop_sel >= 3) { leave_shop(); return; }
+  if (shop_sel >= 4) { leave_shop(); return; }
   if (shop_sel == 0) {
     if (max_hp < 5 && purse >= SHOP_COST[0]) {
       purse -= SHOP_COST[0];
@@ -410,6 +419,12 @@ static void update_shop(int left_pressed, int right_pressed, int jump_pressed, i
     if (!long_shards && purse >= SHOP_COST[2]) {
       purse -= SHOP_COST[2];
       long_shards = 1;
+    }
+  } else if (shop_sel == 3) {
+    if (!auto_kill && purse >= SHOP_COST[3]) {
+      purse -= SHOP_COST[3];
+      auto_kill = 1;
+      bots_killed = 0;
     }
   }
 }
@@ -454,6 +469,27 @@ static void update_play(float dt, GameInput in, int jump_pressed, int action_pre
     s->x += s->vx * dt;
     s->life -= dt;
     if (s->life <= 0) s->live = 0;
+  }
+
+  if (zap_t > 0.0f) zap_t -= dt;
+  if (zap_cd > 0.0f) zap_cd -= dt;
+  if (auto_kill && zap_cd <= 0.0f) {
+    int best = -1;
+    float bd = 60.0f;
+    int k;
+    for (k = 0; k < spider_n; k++) {
+      float d;
+      if (!spiders[k].alive) continue;
+      d = fabsf(spiders[k].x - p.x);
+      if (d < bd) { bd = d; best = k; }
+    }
+    if (best >= 0) {
+      zap_x = spiders[best].x;
+      zap_t = 0.22f;
+      zap_cd = 0.55f;
+      spiders[best].alive = 0;
+      bots_killed++;
+    }
   }
 
   for (i = 0; i < spider_n; i++) {
@@ -587,6 +623,23 @@ static void draw_world(void) {
       rect(px0 + 1, py0 - 5, 2, 4, to565(0x2A2438));
     }
   }
+
+  /* the guardians' strike: two cold lines out of nowhere */
+  if (zap_t > 0.0f) {
+    int x0 = (int)(p.x - cam);
+    int y0 = (int)p.y - 18;
+    int x1 = (int)(zap_x - cam);
+    int y1 = (int)ground_y(zap_x) - 9;
+    int dx = abs(x1 - x0), dy = abs(y1 - y0);
+    int steps = dx > dy ? dx : dy;
+    int s;
+    for (s = 0; s <= steps; s++) {
+      int xx = x0 + (steps ? (x1 - x0) * s / steps : 0);
+      int yy = y0 + (steps ? (y1 - y0) * s / steps : 0);
+      px(xx, yy, to565(0xCFE8FF));
+      px(xx, yy + 1, to565(0x6F9FC8));
+    }
+  }
 }
 
 static void draw_hud(void) {
@@ -685,15 +738,16 @@ static void draw_shop(void) {
       px(49, y + 2, to565(0xFFD9A0));
       px(48, y + 3, to565(0xFFD9A0));
     }
-    if (i == 3) {
-      text("LEAVE THE STALL", 56, y, 1, shop_sel == 3 ? to565(0xFFFFFF) : to565(0xB9B2C8));
+    if (i == 4) {
+      text("LEAVE THE STALL", 56, y, 1, shop_sel == 4 ? to565(0xFFFFFF) : to565(0xB9B2C8));
       text("WALK ON", W - 84, y, 1, to565(0x8A8296));
       continue;
     }
     label = SHOP_NAME[i];
     if (i == 0) owned = max_hp >= 5;
     else if (i == 1) owned = boots;
-    else owned = long_shards;
+    else if (i == 2) owned = long_shards;
+    else owned = auto_kill;
 
     if (owned) {
       text(label, 56, y, 1, to565(0x6B6478));
@@ -706,7 +760,7 @@ static void draw_shop(void) {
          purse >= SHOP_COST[i] ? to565(0xFFD9A0) : to565(0x8A8296));
   }
 
-  if (shop_sel < 3) text_center(SHOP_DESC[shop_sel], 128, 1, to565(0xC9C1D6));
+  if (shop_sel < 4) text_center(SHOP_DESC[shop_sel], 128, 1, to565(0xC9C1D6));
   else text_center("SHE TAKES HER MEMORIES WITH HER.", 128, 1, to565(0xC9C1D6));
 
   if (shop_t > 0.25f) {
@@ -761,6 +815,8 @@ int game_finished(void) { return finished; }
 int game_state(void) { return state; }
 int game_purse(void) { return purse; }
 int game_max_hp(void) { return max_hp; }
+int game_auto_kill(void) { return auto_kill; }
+int game_bots_killed(void) { return bots_killed; }
 
 /* Extras for host tools and tests. */
 float game_ground_at(float x) { return ground_y(x); }

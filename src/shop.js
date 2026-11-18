@@ -7,6 +7,15 @@ import { drawText, wrapText } from './font.js';
 
 export const SHOP_ITEMS = [
   {
+    id: 'warden',
+    name: 'AUTOMATIC BOT KILLER',
+    cost: 2,
+    max: 1,
+    color: '#a9c8ff',
+    desc: 'THE TWO GUARDIANS STRIKE ANY BOT THAT COMES NEAR HER — DOGS, SPIDERS, CRABS. NEVER A BOSS.',
+    bought: 'THE SHADOWS DO NOT WAIT TO BE ASKED. ANYTHING THAT CRAWLS TOO CLOSE IS ALREADY GONE.',
+  },
+  {
     id: 'heart',
     name: 'A SPARE HEART',
     cost: 2,
@@ -49,9 +58,9 @@ export function drawShopOverlay(g, game) {
   if (!s) return;
 
   const px = 64;
-  const py = 38;
+  const py = 24;
   const pw = W - 128;
-  const ph = 194;
+  const ph = 222;
 
   g.save();
   g.fillStyle = 'rgba(3,3,8,0.82)';
@@ -72,8 +81,8 @@ export function drawShopOverlay(g, game) {
     align: 'center', color: '#d8c9a8', scale: 1, spacing: 1,
   });
 
-  const rowH = 22;
-  const top = py + 38;
+  const rowH = 19;
+  const top = py + 34;
   const rows = SHOP_ITEMS.length + 1;
 
   for (let i = 0; i < rows; i++) {
@@ -121,7 +130,7 @@ export function drawShopOverlay(g, game) {
 
   const chosen = SHOP_ITEMS[s.index];
   const desc = chosen ? chosen.desc : 'SHE TAKES HER MEMORIES WITH HER.';
-  let dy = top + rows * rowH + 2;
+  let dy = top + rows * rowH + 4;
   for (const line of wrapText(desc, pw - 30, 1, 1)) {
     drawText(g, line, W / 2, dy, { align: 'center', color: '#c9c1d6', scale: 1, spacing: 1 });
     dy += 11;

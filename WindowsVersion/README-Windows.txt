@@ -1,8 +1,17 @@
-THE LAST JOURNEY — Windows Edition (v1.8)
+THE LAST JOURNEY — Windows Edition (v1.9)
 =========================================
 
 A standalone Windows app: one .exe that opens the game in its own native
 window. No browser, no address bar, no internet connection, no install.
+
+WHAT'S NEW IN v1.9
+------------------
+- THE POWERS NO LONGER COST MEMORIES. The stones are gone; Blue and Brown
+  leave her double jump and dash, and the snow giant leaves her glide.
+  Every memory she finds can go to the peddler now.
+- NEW WARE — AUTOMATIC BOT KILLER (2 memories): the two guardians kill any
+  bot that comes near her by themselves. Never a boss.
+- Same game as the web and Android 1.9 builds.
 
 WHAT'S NEW IN v1.8
 ------------------
@@ -41,7 +50,7 @@ CONTROLS
 Click the window once if the keyboard seems unresponsive — that also
 satisfies Windows' rule that audio may only start after an interaction.
 
-What's included: the same game as Android v1.6 — all levels and biomes,
+What's included: the same game as Android v1.9 — all levels and biomes,
 the powers, both boss battles, the voyage and the ending. The light beam
 ignites like a lightsaber, the shards ring like thrown shuriken, and the
 score turns to heavy metal once the two bosses are down.

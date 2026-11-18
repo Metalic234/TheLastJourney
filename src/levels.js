@@ -54,10 +54,6 @@ const CONFIGS = [
         text: 'Her painted face has worn away. Only the shape of a smile is left.',
       },
     ],
-    power: {
-      id: 'leap', x: 2380, name: 'VERDANT LEAP', color: '#7fe0a4',
-      text: 'The forest lends her a second step in the air. She does not ask why.',
-    },
   },
   {
     id: 'desert',
@@ -86,10 +82,6 @@ const CONFIGS = [
         text: 'A door standing alone in the dunes. Behind it, more desert. No walls. No house.',
       },
     ],
-    power: {
-      id: 'dash', x: 1520, name: 'EMBER DASH', color: '#ffb066',
-      text: 'The sand gives her its heat. For a breath she is already somewhere else.',
-    },
   },
   {
     id: 'mountain',
@@ -123,10 +115,6 @@ const CONFIGS = [
         text: 'Small, and far too thin. Folded neatly on the snow, waiting to be worn again.',
       },
     ],
-    power: {
-      id: 'glide', x: 1760, name: 'FROST GLIDE', color: '#bfe6ff',
-      text: 'The cold holds her weight. Hold W while falling and the mountain sets her down.',
-    },
   },
   {
     id: 'village',
@@ -1237,26 +1225,6 @@ function paintCity(level, g, rng) {
   }
 }
 
-// The stone that trades a memory for a power, painted under the sigil.
-function paintShrine(level, g, rng) {
-  const p = level.power;
-  if (!p) return;
-  const gy = R(groundAt(level, p.x));
-  rect(g, p.x - 12, gy - 3, 24, 3, '#2b2934');
-  rect(g, p.x - 12, gy - 3, 24, 1, '#4b4859');
-  rect(g, p.x - 8, gy - 6, 16, 3, '#35323f');
-  rect(g, p.x - 8, gy - 6, 16, 1, '#545063');
-  rect(g, p.x - 5, gy - 9, 10, 3, '#403d4c');
-  rect(g, p.x - 5, gy - 9, 10, 1, '#5f5a70');
-  rect(g, p.x - 1, gy - 26, 2, 17, '#2a2833');
-  rect(g, p.x - 7, gy - 25, 14, 1, '#2a2833');
-  rect(g, p.x - 6, gy - 22, 12, 1, '#33303d');
-  for (let i = 0; i < 4; i++) {
-    rect(g, p.x - 9 + i * 5, gy - 1, 3, 1, rgba(p.color, 0.5));
-  }
-  level.lights.push({ x: p.x, y: gy - 24, r: 30, color: p.color, alpha: 0.2, flicker: 0.5 });
-}
-
 // ---------- the port ------------------------------------------------------
 
 const PORT_DOCK_END = 1960;   // the pier ends and the water begins
@@ -1504,7 +1472,6 @@ function paintTerrain(level, g, rng) {
     case 'port': paintPort(level, g, rng); break;
     default: paintVillage(level, g, rng); break;
   }
-  if (level.power) paintShrine(level, g, rng);
 }
 
 // ---------- parallax layers ------------------------------------------------
@@ -2391,7 +2358,6 @@ function buildFromConfig(cfg, index) {
     solids: [],
     valleyFires: [],
     memories: cfg.memories.map((m) => ({ ...m })),
-    power: cfg.power ? { ...cfg.power } : null,
     arenaX: cfg.story ? 1852 : null,
     finale: !!cfg.finale,
     teens: cfg.story ? CITY_TEENS.map((t) => ({ ...t })) : null,
@@ -2409,7 +2375,6 @@ function buildFromConfig(cfg, index) {
     dolphinBridges: (cfg.dolphinBridges || []).slice(),
   };
   for (const m of level.memories) m.y = groundAt(level, m.x) - 25;
-  if (level.power) level.power.y = groundAt(level, level.power.x);
 
   if (level.cliffs) {
     // The bridge decks sit level with the cliff edge. Work out their height

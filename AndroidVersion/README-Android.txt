@@ -1,5 +1,19 @@
-THE LAST JOURNEY — Android Edition (v1.8)
+THE LAST JOURNEY — Android Edition (v1.9)
 ==========================================
+
+WHAT'S NEW IN v1.9
+------------------
+- THE POWERS ARE FREE NOW. The three memory stones are gone: she no longer
+  pays a memory to learn to jump twice, to dash or to glide, so every
+  memory she finds can go to the peddler instead.
+  Blue and Brown leave her DOUBLE JUMP (W in the air) and DASH (Shift)
+  when the last street is finished; the snow giant leaves her GLIDE
+  (hold W while falling) when it kneels.
+- NEW WARE — AUTOMATIC BOT KILLER (2 memories): the two guardians strike
+  whatever comes near her, dogs, spiders and crabs alike, with no input at
+  all. It does nothing to a boss.
+- Same release key as v1.8, so it installs straight over it: versionName
+  1.9, versionCode 10.
 
 WHAT'S NEW IN v1.8
 ------------------

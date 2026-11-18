@@ -47,13 +47,16 @@ int main(int argc, char **argv) {
     memset(&in, 0, sizeof(in));
 
     if (game_state() == 4) {
-      /* the peddler: buy for a while, then take the road */
+      /* the peddler: walk the rows to the bot killer, buy it, then take the road */
       shop_frames++;
       if (shop_frames == 2) { write_ppm(dir, f); printf("shop window at frame %d (purse %d)\n", f, game_purse()); }
-      in.action = (shop_frames % 6) == 0;
-      in.right = (shop_frames % 30) == 0;
-      if (shop_frames > 90 && (shop_frames % 2) == 0) in.jump = 1;
+      in.left = (shop_frames == 1 || shop_frames == 3);
+      in.action = shop_frames == 5;
+      if (shop_frames > 40 && (shop_frames % 2) == 0) in.jump = 1;
       game_update(dt, in);
+      if (shop_frames == 7) {
+        printf("bot killer owned at frame %d (purse %d)\n", f, game_purse());
+      }
       continue;
     }
     if (shop_frames) { shop_shots++; shop_frames = 0; }
@@ -74,5 +77,6 @@ int main(int argc, char **argv) {
   printf("stage=%d hp=%d/%d purse=%d memories=%d/%d shops=%d finished=%d\n",
          game_stage(), game_hp(), game_max_hp(), game_purse(), game_memories(),
          game_total_memories(), shop_shots, game_finished());
+  printf("auto_kill=%d bots_killed=%d\n", game_auto_kill(), game_bots_killed());
   return 0;
 }

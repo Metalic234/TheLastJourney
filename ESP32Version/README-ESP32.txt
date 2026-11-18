@@ -34,10 +34,15 @@ the boss gate of the bigger versions.
   C              buy the chosen ware (memories are spent, not borrowed)
   X              leave the stall and take the next road
 
-  EXTRA HEART    2 memories   one more heart, up to five, and she is mended
-  SWIFT BOOTS    1 memory     she runs faster on every road after this
-  LONG SHARDS    1 memory     her shards carry further before they fall
-  LEAVE THE STALL             walk on
+  EXTRA HEART          2 memories  one more heart, up to five, and she is mended
+  SWIFT BOOTS          1 memory    she runs faster on every road after this
+  LONG SHARDS          1 memory    her shards carry further before they fall
+  AUTOMATIC BOT KILLER 2 memories  two shadows kill any spider that comes
+                                   near her, without a button. Bought once.
+  LEAVE THE STALL                  walk on
+
+The bot killer is the pocket edition's version of the guardians' sweep: the
+pocket game has no bosses, so there is nothing here it is not allowed to hit.
 
 Memories are a purse: each road's four pickups add to it, and only the
 stall spends it.

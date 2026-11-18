@@ -42,7 +42,8 @@ const MIST = {
   cliffs: { color: '#b9dcc4', alpha: 0.07, y: 126, h: 126 },
 };
 
-// The three powers she can buy from the stones, and the colour of each.
+// The three powers the road gives her back: Blue and Brown leave her the
+// second step and the dash, and the snow giant leaves her the glide.
 const POWERS = [
   { id: 'leap', name: 'LEAP', color: '#7fe0a4' },
   { id: 'glide', name: 'GLIDE', color: '#bfe6ff' },
@@ -104,7 +105,6 @@ export class Game {
     this.ending = null;
     this.powers = new Set();
     this.memory = 0;
-    this.nearPower = null;
     this.bought = new Map();
     this.shop = null;
     this.shopNear = false;
@@ -155,11 +155,11 @@ export class Game {
     return [
       {
         x: px - 52, y: gy(px - 52) - 22, off: 52, hover: 22, hoverCur: 22,
-        phase: 0.7, ember: 0, lean: 0,
+        phase: 0.7, ember: 0, lean: 0, sweepCd: 0,
       },
       {
         x: px - 104, y: gy(px - 104) - 36, off: 104, hover: 36, hoverCur: 36,
-        phase: 2.4, ember: 0, lean: 0,
+        phase: 2.4, ember: 0, lean: 0, sweepCd: 0,
       },
     ];
   }
@@ -183,7 +183,6 @@ export class Game {
     this.guardians = this.makeGuardians(p);
     this.particles.length = 0;
     this.nearby = null;
-    this.nearPower = null;
     this.shop = null;
     this.shopNear = false;
     this.finale = null;
@@ -650,10 +649,6 @@ export class Game {
     }
     this.nearby = best;
 
-    // a stone with a power in it, waiting to be paid for
-    const pw = this.level.power;
-    this.nearPower = pw && !this.powers.has(pw.id) && Math.abs(pw.x - p.x) < 32 ? pw : null;
-
     // the peddler's stall: walk up to it and the window opens
     if (this.shop && !this.shop.open) {
       this.shopNear = Math.abs(this.shop.x - p.x) < 34;
@@ -669,39 +664,33 @@ export class Game {
       if (this.input.consume('interact')) this.collect(best);
       return;
     }
-    if (this.nearPower && this.input.consume('interact')) this.awaken();
   }
 
-  awaken() {
-    const pw = this.level.power;
-    if (!pw) return;
-    if (this.memory <= 0) {
-      this.note = {
-        title: pw.name,
-        text: 'The stone is cold and waits. It wants a memory, and she has none left to give.',
-        color: '#8a8296',
-        t: 0,
-        typed: 0,
-      };
-      this.audio.play('whisper');
-      return;
+  // The powers are not bought any more: each boss leaves one behind. Blue and
+  // Brown leave the second step and the dash; the snow giant leaves the glide.
+  grantPowers(ids, title, text, color) {
+    const fresh = [];
+    for (const id of ids) {
+      if (!this.powers.has(id)) {
+        this.powers.add(id);
+        fresh.push(id);
+      }
     }
-    this.memory -= 1;
-    this.powers.add(pw.id);
-    this.nearPower = null;
-    this.note = { title: pw.name, text: pw.text, color: pw.color, t: 0, typed: 0 };
+    if (!fresh.length) return;
+    this.note = { title, text, color, t: 0, typed: 0 };
     this.audio.play('power');
-    for (let i = 0; i < 34; i++) {
+    const p = this.player;
+    for (let i = 0; i < 30; i++) {
       const a = Math.random() * TAU;
       const sp = 16 + Math.random() * 52;
       this.spawn({
         type: 'spark',
-        x: pw.x,
-        y: pw.y - 24,
+        x: p.x,
+        y: p.y - 14,
         vx: Math.cos(a) * sp,
         vy: Math.sin(a) * sp - 16,
         size: 1,
-        color: i % 3 ? pw.color : '#ffffff',
+        color: i % 3 ? color : '#ffffff',
         max: 0.9 + Math.random() * 1.1,
         grav: 16,
         drag: 0.97,
@@ -935,7 +924,6 @@ export class Game {
   beginFinale() {
     this.frozen = true;
     this.nearby = null;
-    this.nearPower = null;
     this.card = null;
     this.audio.play('transition');
     // The city is no longer walked: the last street is a scene she arrives in.
@@ -1157,7 +1145,7 @@ export class Game {
 
     const p = this.player;
     // The last street is the arena. One opponent, and enough room to leave a mark.
-    // She keeps her feet, her jump and her dash: the arena only limits distance.
+    // She keeps her feet and her jump: the arena only limits distance.
     p.x = clamp(p.x, battle.arenaMin, battle.arenaMax);
     const airborne = p.y < groundAt(this.level, p.x) - 10;
 
@@ -1737,6 +1725,13 @@ export class Game {
     this.storyMetal = true;
     this.audio.setBeam(false);
     this.audio.applyBiome('metal');
+    // Both of them are down. What they leave her costs no memory at all.
+    this.grantPowers(
+      ['leap', 'dash'],
+      'TWO POWERS, FREELY GIVEN',
+      'Blue had the ground and Brown had the street, and both are gone. Their last gift needs no memory: a second step in the air, and Shift to be somewhere else for a breath. The peddler is already waiting up the road.',
+      '#9fc8ff',
+    );
     // The street is done, so the peddler sets up on the way out. She walks to
     // his stall if she wants to, then walks on to the water.
     if (!this.shopGiven) {
@@ -2069,6 +2064,7 @@ export class Game {
       }
     }
     c.guardianLasers = c.guardianLasers.filter((beam) => beam.t < beam.dur);
+    if (this.upgradeCount('warden') > 0) this.guardianSweep(dt);
 
     if (c.boss && c.boss.active && c.boss.alive) {
       if (c.boss.kind === 'giant') this.updateGiant(dt);
@@ -2289,17 +2285,52 @@ export class Game {
   }
 
   guardianAnswer(spider) {
+    this.guardianStrike(spider);
+  }
+
+  // One guardian, one bot, one answer. Anything alive that is not the boss.
+  guardianStrike(foe) {
     const c = this.combat;
-    if (!c || !spider || !spider.alive || spider.doomed) return;
-    spider.doomed = true;
+    if (!c || !foe || !foe.alive || foe.doomed) return;
+    foe.doomed = true;
     c.guardianLasers.push({
-      target: spider,
-      x: spider.x,
+      target: foe,
+      x: foe.x,
       t: 0,
-      dur: 0.55,
+      dur: 0.45,
       hit: false,
     });
     this.audio.play('guardianBeam');
+  }
+
+  // AUTOMATIC BOT KILLER (the peddler's ware): while it is hers, the two
+  // guardians strike whatever crawls close to her — dogs, spiders, crabs —
+  // and they never raise a hand against a boss.
+  guardianSweep(dt) {
+    const c = this.combat;
+    if (!c) return;
+    const p = this.player;
+    for (let i = 0; i < this.guardians.length; i++) {
+      const gd = this.guardians[i];
+      gd.sweepCd = Math.max(0, (gd.sweepCd || 0) - dt);
+      if (gd.sweepCd > 0) continue;
+      let best = null;
+      let bestD = 150;
+      const consider = (foe) => {
+        if (!foe || !foe.alive || foe === c.boss) return;
+        const d = Math.abs(foe.x - p.x);
+        if (d < bestD) {
+          bestD = d;
+          best = foe;
+        }
+      };
+      for (const dog of c.dogs) consider(dog);
+      for (const spider of c.spiders) consider(spider);
+      for (const crab of c.crabs) consider(crab);
+      if (!best) continue;
+      this.guardianStrike(best);
+      gd.sweepCd = 1.1 + i * 0.2;
+    }
   }
 
   throwWildsShards() {
@@ -2506,15 +2537,24 @@ export class Game {
         drag: 0.95,
       });
     }
-    this.note = {
-      title: b.name || 'THE SCORPION',
-      text: giant
-        ? 'The snow giant kneels, and the pass is quiet. The way north is open.'
-        : 'It folds its legs and becomes part of the sand. The way south is open.',
-      color: b.color || '#e0a060',
-      t: 0,
-      typed: 0,
-    };
+    if (giant && !this.powers.has('glide')) {
+      this.grantPowers(
+        ['glide'],
+        'THE MOUNTAIN LETS HER STAY',
+        'The snow giant kneels, and the pass is quiet. The cold that held it up holds her now: hold W while falling and she sets herself down. The way north is open.',
+        '#bfe6ff',
+      );
+    } else {
+      this.note = {
+        title: b.name || 'THE SCORPION',
+        text: giant
+          ? 'The snow giant kneels, and the pass is quiet. The way north is open.'
+          : 'It folds its legs and becomes part of the sand. The way south is open.',
+        color: b.color || '#e0a060',
+        t: 0,
+        typed: 0,
+      };
+    }
     // The boss is down. The peddler sets up in the space behind her.
     this.openStall(this.player.x - 96);
   }
@@ -3150,7 +3190,6 @@ export class Game {
   beginLookout() {
     this.frozen = true;
     this.nearby = null;
-    this.nearPower = null;
     this.card = null;
     this.note = null;
     this.lookedOut = true;
@@ -3615,7 +3654,6 @@ export class Game {
     this.drawMist(g);
     this.drawTerrain(g);
     this.drawMemories(g);
-    this.drawPowerSite(g);
     this.drawEntities(g);
     this.drawParticles(g);
     this.drawVillageFires(g);
@@ -4182,36 +4220,6 @@ export class Game {
     }
   }
 
-  drawPowerSite(g) {
-    const pw = this.level.power;
-    if (!pw || this.powers.has(pw.id)) return;
-    const sx = pw.x - this.cam.x;
-    if (sx < -40 || sx > W + 40) return;
-    const baseY = pw.y;
-    const bob = Math.sin(this.time * 1.4) * 2;
-    const cy = baseY - 24 + bob;
-    g.save();
-    g.globalCompositeOperation = 'lighter';
-    glow(g, sx, cy, 24, pw.color, 0.3);
-    g.restore();
-    disc(g, sx, cy, 2, pw.color);
-    for (let i = 0; i < 8; i++) {
-      const a = this.time * 0.9 + (i / 8) * TAU;
-      g.fillStyle = pw.color;
-      g.fillRect(Math.round(sx + Math.cos(a) * 8), Math.round(cy + Math.sin(a) * 5), 1, 1);
-    }
-    if (this.nearPower === pw) {
-      const pulse = 0.6 + Math.sin(this.time * 4) * 0.4;
-      const label = this.memory > 0 ? 'E  SPEND A MEMORY' : 'ONE MEMORY NEEDED';
-      drawText(g, label, sx, baseY - 46 + bob, {
-        align: 'center',
-        color: rgba(this.memory > 0 ? '#ffffff' : '#8a8296', pulse),
-        scale: 1,
-        shadow: '#000000',
-      });
-    }
-  }
-
   drawFinale(g) {
     const f = this.finale;
     const L = this.level;
@@ -4768,7 +4776,7 @@ export class Game {
         color: this.memory > 0 ? '#e4d9b8' : '#5d566e', scale: 1,
       });
     }
-    // the powers she has bought, each in its own colour
+    // the powers the bosses left her, each in its own colour
     let px = x;
     for (const pw of POWERS) {
       if (!this.powers.has(pw.id)) continue;
@@ -4793,7 +4801,7 @@ export class Game {
       const a = clamp(this.hintT < 7 ? 1 : 9 - this.hintT, 0, 1) * 0.85;
       g.save();
       g.globalAlpha = a;
-      drawText(g, 'A D WALK   W JUMP   E REMEMBER / SPEND   SHIFT DASH   X SHARDS   C BEAM', W / 2, H - 30, {
+      drawText(g, 'A D WALK   W JUMP   E REMEMBER   X SHARDS   C BEAM', W / 2, H - 30, {
         align: 'center', color: '#b8b0c4', scale: 1,
       });
       g.restore();
