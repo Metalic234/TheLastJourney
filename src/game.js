@@ -210,8 +210,10 @@ export class Game {
     this.audio.applyBiome(this.moodBiome());
     this.showCard(this.level);
     if (this.level.hostile) this.initWilds();
-    // The soul peddler is already set up where every road begins.
+    // The soul peddler is already set up where every road begins, and the
+    // purse for this road is filled before she takes a step.
     this.openStall(this.level.spawnX + 66);
+    this.openSoulPurse(this.level);
   }
 
   showCard(level) {
@@ -222,6 +224,8 @@ export class Game {
     this.found.clear();
     this.powers.clear();
     this.souls = 0;
+    this.soulPurse = null;
+    this.soulEvents = 0;
     this.stamina = this.staminaMax;
     this.winded = false;
     this.lifeHP = null;
@@ -525,7 +529,7 @@ export class Game {
       p.vx = p.facing * DASH_SPEED;
     } else {
       const gait = running ? SPEED * 1.62 : SPEED;
-      p.vx = damp(p.vx, move * gait * (1 + 0.14 * this.upgradeCount('boots')), 13, dt);
+      p.vx = damp(p.vx, move * gait, 13, dt);
     }
 
     const nx = p.x + p.vx * dt;
@@ -757,15 +761,34 @@ export class Game {
     }
   }
 
-  // Souls are what the road pays her: ten at the least, a hundred almost never.
+  // A road puts a purse in her hands, not a slot machine: everything on a
+  // stage pays out of the same 35-80 souls, split across the memories and the
+  // bots standing on it. One road in two hundred is a lone hundred instead,
+  // paid in one go at its first pickup, and spends the purse at once.
+  openSoulPurse(level) {
+    const lv = level || this.level;
+    const bots = (lv.dogs?.length || 0) + (lv.spiders?.length || 0) + (lv.crabs?.length || 0);
+    const stone = lv.boss ? 1 : 0;
+    this.soulPurse = 35 + Math.floor(Math.random() * 46);
+    this.soulPurseStart = this.soulPurse;
+    this.soulEvents = Math.max(1, (lv.memories?.length || 0) + bots + stone);
+  }
+
   rollSouls() {
-    const r = Math.random();
-    if (r < 0.60) return 10;
-    if (r < 0.80) return 15;
-    if (r < 0.92) return 20;
-    if (r < 0.97) return 30;
-    if (r < 0.995) return 50;
-    return 100;
+    if (this.soulPurse == null) this.openSoulPurse(this.level);
+    this.soulEvents = Math.max(0, this.soulEvents - 1);
+    if (this.soulPurse <= 0) return 0;
+    if (this.soulPurse === this.soulPurseStart && Math.random() < 0.005) {
+      this.soulPurse = 0;
+      return 100;
+    }
+    // the last payout on the road takes whatever is left, to the coin
+    const left = this.soulEvents + 1;
+    const amount = left <= 1
+      ? this.soulPurse
+      : clamp(Math.round((this.soulPurse / left) * (0.8 + Math.random() * 0.4)), 1, this.soulPurse);
+    this.soulPurse -= amount;
+    return amount;
   }
 
   addSouls(amount, x, y) {
@@ -812,7 +835,7 @@ export class Game {
 
   // The duel uses the same life she carries between roads.
   heroVitals() {
-    const max = 100 + 25 * this.upgradeCount('heart');
+    const max = 100;
     this.lifeMax = max;
     const hp = this.lifeHP == null ? max : clamp(this.lifeHP, 0, max);
     return { hp, max, hurt: 0 };
@@ -1462,7 +1485,7 @@ export class Game {
       shard.x += shard.vx * dt;
       shard.y += shard.vy * dt;
       if (Math.hypot(dx, dy) < 12) {
-        this.damageBoss(target, 1 + this.upgradeCount('shard'), shard.x, shard.y);
+        this.damageBoss(target, 1, shard.x, shard.y);
         continue;
       }
       survivors.push(shard);
@@ -1565,7 +1588,7 @@ export class Game {
     const beamY = groundAt(this.level, this.player.x) - 40;
     const bossY = groundAt(this.level, target.x) - 22;
     if (Math.abs(bossY - beamY) <= 44) {
-      this.damageBoss(target, 6 + 3 * this.upgradeCount('beam'), target.x - 8, bossY);
+      this.damageBoss(target, 6, target.x - 8, bossY);
     }
   }
 
@@ -1930,7 +1953,7 @@ export class Game {
       stomp: 0,
     } : null;
     // Her life is hers for the whole road: a new stage does not mend her.
-    this.lifeMax = 100 + 25 * this.upgradeCount('heart');
+    this.lifeMax = 100;
     const startHP = this.lifeHP == null
       ? this.lifeMax : clamp(this.lifeHP, 0, this.lifeMax);
     this.combat = {
@@ -2168,7 +2191,7 @@ export class Game {
       shard.x += shard.vx * dt;
       shard.y += shard.vy * dt;
       if (Math.hypot(target.x - shard.x, ty - shard.y) < 15) {
-        this.damageWilds(target, 1 + this.upgradeCount('shard'), shard.x, shard.y);
+        this.damageWilds(target, 1, shard.x, shard.y);
         continue;
       }
       keep.push(shard);
@@ -2481,28 +2504,28 @@ export class Game {
       if (!dog.alive) continue;
       const ahead = (dog.x - p.x) * dir;
       if (ahead > -10 && ahead < 430 && Math.abs(groundAt(L, dog.x) - 22 - beamY) < 58) {
-        this.damageWilds(dog, 6 + 3 * this.upgradeCount('beam'), dog.x, groundAt(L, dog.x) - 9);
+        this.damageWilds(dog, 6, dog.x, groundAt(L, dog.x) - 9);
       }
     }
     for (const spider of c.spiders) {
       if (!spider.alive) continue;
       const ahead = (spider.x - p.x) * dir;
       if (ahead > -10 && ahead < 430 && Math.abs(groundAt(L, spider.x) - 17 - beamY) < 58) {
-        this.damageWilds(spider, 6 + 3 * this.upgradeCount('beam'), spider.x, groundAt(L, spider.x) - 15);
+        this.damageWilds(spider, 6, spider.x, groundAt(L, spider.x) - 15);
       }
     }
     for (const crab of c.crabs) {
       if (!crab.alive) continue;
       const ahead = (crab.x - p.x) * dir;
       if (ahead > -10 && ahead < 430 && Math.abs(groundAt(L, crab.x) - 12 - beamY) < 58) {
-        this.damageWilds(crab, 6 + 3 * this.upgradeCount('beam'), crab.x, groundAt(L, crab.x) - 10);
+        this.damageWilds(crab, 6, crab.x, groundAt(L, crab.x) - 10);
       }
     }
     if (c.boss && c.boss.active && c.boss.alive) {
       const ahead = (c.boss.x - p.x) * dir;
       const bossH = c.boss.kind === 'giant' ? 48 : 32;
       if (ahead > -10 && ahead < 540 && Math.abs(groundAt(L, c.boss.x) - bossH - beamY) < 76) {
-        this.damageWilds(c.boss, 3 + 2 * this.upgradeCount('beam'), c.boss.x - 12, groundAt(L, c.boss.x) - bossH);
+        this.damageWilds(c.boss, 3, c.boss.x - 12, groundAt(L, c.boss.x) - bossH);
       }
     }
   }
@@ -4872,8 +4895,11 @@ export class Game {
       const a = clamp(this.hintT < 7 ? 1 : 9 - this.hintT, 0, 1) * 0.85;
       g.save();
       g.globalAlpha = a;
-      drawText(g, 'A D WALK   W JUMP   E REMEMBER   X SHARDS   C BEAM', W / 2, H - 30, {
+      drawText(g, 'A D WALK   W JUMP   HOLD SHIFT TO RUN', W / 2, H - 38, {
         align: 'center', color: '#b8b0c4', scale: 1,
+      });
+      drawText(g, 'E REMEMBER   RUNNING SPENDS HER BREATH', W / 2, H - 27, {
+        align: 'center', color: '#8d869f', scale: 1,
       });
       g.restore();
     }

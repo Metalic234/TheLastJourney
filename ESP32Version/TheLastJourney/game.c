@@ -113,6 +113,9 @@ static int finished;
  * across the run, and the stall at the first of every road spends them. */
 #define SHOP_ROWS 3
 static int souls;
+static int purse;      /* souls this road will pay in all: 35-80 */
+static int purse_start;/* the purse as it was filled, to spot the lone hundred */
+static int purse_left; /* payouts still waiting on the road */
 static int max_hp = 3;
 static int shop_sel;
 static int auto_kill;
@@ -127,15 +130,30 @@ static const char *SHOP_DESC[2] = {
   "HER LIFE FILLS TO THE BRIM AGAIN.",
 };
 
-/* Souls come in tens, and a hundred is almost never seen. */
+/* A road pays 35 to 80 souls in all, split across the spiders standing on it:
+ * each kill takes its share of the purse. One road in two hundred is a lone
+ * hundred instead, paid in one go at its first kill, and spends the purse. */
 static int roll_souls(void) {
-  int r = rand() % 1000;
-  if (r < 850) return 10;
-  if (r < 930) return 15;
-  if (r < 970) return 20;
-  if (r < 990) return 30;
-  if (r < 998) return 50;
-  return 100;
+  int share, jitter, amount;
+  if (purse <= 0) return 0;
+  if (purse_left <= 0) purse_left = 1;
+  if (purse == purse_start && (rand() % 200) == 0) {
+    purse = 0;
+    purse_left = 0;
+    return 100;
+  }
+  if (purse_left <= 1) {
+    amount = purse; /* the last kill takes whatever is left, to the soul */
+  } else {
+    share = purse / purse_left;
+    jitter = share / 5;
+    amount = share + (jitter > 0 ? (rand() % (2 * jitter + 1)) - jitter : 0);
+    if (amount < 1) amount = 1;
+    if (amount > purse) amount = purse;
+  }
+  purse -= amount;
+  purse_left--;
+  return amount;
 }
 
 /* ---- helpers ----------------------------------------------------------- */
@@ -334,6 +352,10 @@ static void reset_stage(int idx) {
 
   spider_n = 3 + idx;
   if (spider_n > MAX_SPIDERS) spider_n = MAX_SPIDERS;
+  /* the purse for this road, filled before she takes a step */
+  purse = 35 + rand() % 46;
+  purse_start = purse;
+  purse_left = spider_n;
   {
     static const float sfrac[5] = { 0.30f, 0.48f, 0.62f, 0.76f, 0.90f };
     for (i = 0; i < spider_n; i++) {

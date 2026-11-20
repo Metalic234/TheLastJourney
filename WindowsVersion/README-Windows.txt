@@ -1,10 +1,19 @@
-THE LAST JOURNEY — Windows Edition (v2.0)
-=========================================
+THE LAST JOURNEY — Windows Edition (v2.0.1)
+===========================================
+
+WHAT'S NEW IN v2.0.1
+--------------------
+- SOULS ARE PAID OUT PER ROAD, NOT PER KILL: every stage pays 35 to 80
+  souls in all, split across the memories and bots on it. One pickup in
+  two hundred is still a lone hundred.
+- THE OPENING HINT LINE NOW TEACHES RUNNING: HOLD SHIFT TO RUN, RUNNING
+  SPENDS HER BREATH. Running is hers from the first step; only the dash
+  waits for Blue and Brown.
 
 WHAT'S NEW IN v2.0
 ------------------
 - MEMORIES ARE SOULS NOW: every bot she puts down and every memory she
-  picks up pays ten to a hundred souls.
+  picks up pays souls, 35 to 80 per road.
 - STAMINA AND RUNNING: hold Shift to sprint at nearly twice her walk. It
   spends her breath, drawn under the souls counter; the dash is free.
 - THE SHOP IS ON EVERY ROAD, at the start of all eight stages.
@@ -53,7 +62,8 @@ CONTROLS
   Up / W / Space        jump (hold in mid-air to glide once learned)
   Down / S              duck
   E or Enter            interact / talk / collect / continue
-  Shift or J            dash (once unlocked); hold it to run
+  Shift or J            hold to run (from the first step); tap to dash
+                        once Blue and Brown have awakened it
   X                     white shards (once unlocked)
   C                     light beam (hold; once unlocked)
   P or Escape           pause

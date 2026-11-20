@@ -76,6 +76,7 @@ ANDROID_BUILD_TOOLS="$(posix_path "${ANDROID_BUILD_TOOLS:-}")"
 [ -f "$PROPS" ]             || die "missing $PROPS"
 [ -f "$ROOT/src/main.js" ]  || die "missing game sources: $ROOT/src/main.js"
 [ -f "$ROOT/styles.css" ]   || die "missing $ROOT/styles.css"
+[ -f "$HERE/touch.js" ]     || die "missing touch overlay: $HERE/touch.js"
 
 # --- tools -----------------------------------------------------------------
 if [ -n "${APKTOOL_JAR:-}" ]; then
@@ -152,6 +153,8 @@ printf '==> Bundling game sources\n'
     --target=es2020 --charset=utf8 --log-level=warning \
     --outfile="$APP/assets/www/game.bundle.js" >/dev/null )
 cp "$ROOT/styles.css" "$APP/assets/www/styles.css"
+# Touch overlay lives in this folder so button fixes ship in a rebuild.
+cp "$HERE/touch.js" "$APP/assets/www/touch.js"
 
 # --- version ---------------------------------------------------------------
 CUR_CODE="$(awk '/^  versionCode:/{print $2; exit}' "$APP/apktool.yml")"

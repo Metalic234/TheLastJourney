@@ -1,10 +1,26 @@
-THE LAST JOURNEY — Android Edition (v2.0)
-==========================================
+THE LAST JOURNEY — Android Edition (v2.0.1)
+============================================
+
+WHAT'S NEW IN v2.0.1
+--------------------
+- SOULS ARE PAID OUT PER ROAD, NOT PER KILL. Every stage now pays between
+  35 and 80 souls in all, split evenly across the memories and bots
+  standing on it, so the crowded cliff road no longer drowns her in
+  souls. One pickup in two hundred is still a lone hundred, and that alone
+  spends the whole road's purse.
+- THE DASH BUTTON IS ON SCREEN FROM THE FIRST ROAD. It used to appear only
+  after Ember Dash was awakened, but holding it already ran her — so now
+  it is there from the start. Hold it to run, tap it to dash once the
+  power is hers.
+- The opening hint line teaches it: HOLD SHIFT TO RUN, RUNNING SPENDS HER
+  BREATH.
+- Same release key as v2.0, so it installs straight over it: versionName
+  2.0.1, versionCode 12.
 
 WHAT'S NEW IN v2.0
 ------------------
 - MEMORIES ARE SOULS NOW. Every bot she puts down and every memory she
-  picks up pays out souls: ten at the least, a hundred almost never.
+  picks up pays out souls, and each road pays 35 to 80 in all.
 - SHE HAS STAMINA AND SHE CAN RUN. Hold Shift (or the dash button on a
   phone) while walking and she sprints at nearly twice her walk until her
   breath runs out; it comes back while she walks. The dash itself costs

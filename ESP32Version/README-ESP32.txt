@@ -41,8 +41,9 @@ takes a step: souls in, power out.
   LEAVE THE STALL                 walk on
 
 Souls come off the spiders she puts down (the guardian's kills pay too) and
-they never vanish between roads: ten at the least, fifteen, twenty, thirty,
-fifty, and a hundred almost never. Her hearts do NOT refill at the start of
+they never vanish between roads. Each road pays 35 to 80 souls in all, split
+across the spiders standing on it, so no road is a jackpot. One kill in two
+hundred is a lone hundred instead, and spends that road's purse at once. Her hearts do NOT refill at the start of
 a new road — only the stall mends her. A retry after a fall starts that road
 with a whole heart bar.
 
