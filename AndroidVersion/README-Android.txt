@@ -1,5 +1,28 @@
-THE LAST JOURNEY — Android Edition (v2.0.1)
+THE LAST JOURNEY — Android Edition (v2.1.0)
 ============================================
+
+WHAT'S NEW IN v2.1.0
+--------------------
+- THE ROADS ARE LONGER AND BUSIER. Every stage with bots on it grew by a
+  quarter to a half, and carries two or three more of them: spiders all
+  the way to the far trees, more black dogs in both deserts, more crabs on
+  the cliffs.
+- TWO NEW BOSSES. A GIANT HUMANOID TIGER waits at the end of the ruined
+  city: it stalks her on two legs, swipes with one paw, and leaps at the
+  ground where she is standing. Past the last cliffs, on a new bridge,
+  THE WATER DRAGON vaults from one end of the bridge to the other, and
+  after every second landing breathes a Steam Blast that costs her an
+  eighth of her life. It has the same health bar the scorpion had.
+- WHILE A BOSS STANDS, EVERYTHING AIMS AT IT. Her shards curve to the
+  boss and the knights' beam reaches it from any side, whichever way she
+  is facing or running.
+- THE FOREST SPIDERS CAN BE CUT. X and C hurt and kill them like any
+  other bot, and the guardians no longer strike them for her when they
+  bite.
+- THE OPENING HINT NAMES THE BUTTON: HOLD THE DASH BUTTON TO RUN — there
+  is no Shift key on a phone.
+- Same release key as v2.0.1, so it installs straight over it: versionName
+  2.1.0, versionCode 13.
 
 WHAT'S NEW IN v2.0.1
 --------------------

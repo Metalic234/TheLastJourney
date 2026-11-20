@@ -35,6 +35,8 @@ int game_state(void);
 int game_purse(void);
 int game_max_hp(void);
 int game_auto_kill(void);
+int game_boss_kind(void);
+int game_boss_hp(void);
 int game_bots_killed(void);
 int game_souls(void);
 int game_stamina(void);

@@ -1,5 +1,21 @@
-THE LAST JOURNEY — Windows Edition (v2.0.1)
+THE LAST JOURNEY — Windows Edition (v2.1.0)
 ===========================================
+
+WHAT'S NEW IN v2.1.0
+--------------------
+- LONGER ROADS, MORE OF EVERYTHING. The stages with bots grew by a quarter
+  to a half and carry two or three more: more spiders in the forest, more
+  black dogs in the deserts, more crabs on the cliffs.
+- TWO NEW BOSSES. A GIANT HUMANOID TIGER holds the end of the ruined city
+  — it stalks her, swipes, and leaps at her feet — and THE WATER DRAGON
+  waits past the last cliffs on a new bridge, vaulting from side to side
+  and breathing a Steam Blast after every second landing that costs her an
+  eighth of her health. The dragon's bar is the scorpion's.
+- BOSS AIM LOCK. While a boss stands, X shards and the knights' C beam
+  turn on it from every direction: run and face anywhere.
+- FOREST SPIDERS CAN BE CUT with X and C like any other bot, and the
+  guardians no longer strike them when they bite her.
+- Same release key / save-free install as v2.0.1: version 2.1.0.
 
 WHAT'S NEW IN v2.0.1
 --------------------

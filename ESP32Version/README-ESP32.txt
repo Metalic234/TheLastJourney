@@ -10,9 +10,10 @@ WHAT IT IS (AND IS NOT)
 -----------------------
 This is the pocket edition, not a byte-for-byte port of the desktop game.
 It keeps the shape of the story — three roads, memory shards to collect,
-spiders on the path, a death that restarts the stage, and an ending — but
-it runs with simplified art, no bosses, no voyage and no sound. The full
-game stays on Android, Windows and the web.
+spiders on the path, a keeper at the end of the last two roads, a death
+that restarts the stage, and an ending — but it runs with simplified art,
+no voyage and no sound. The full game stays on Android, Windows and the
+web.
 
 CONTROLS
 --------
@@ -21,9 +22,25 @@ CONTROLS
   SHARD          throw a shard. Spiders die in one hit; touching one costs
                  a heart. HOLD SHARD while walking and she runs: the sprint
                  spends her breath (the thin bar under the hearts) and it
-                 comes back while she walks.
+                 comes back while she walks. While a keeper is standing she
+                 throws in BOTH directions, so the aim is on it either way.
   Collect all four memories on a road, then reach its end to continue.
   Falling into a gap costs the whole run of that road.
+
+THE KEEPERS
+-----------
+The last two roads end in a fight. The keeper holds the end of the road
+and cannot be walked past.
+
+  THE TIGER OF THE RUINS   ends the drowned ruins. It stalks her on two
+                           legs, swipes when close, and leaps at her.
+  THE WATER DRAGON         ends the burning city. It hops from one end of
+                           its span to the other, and after every second
+                           landing a Steam Blast takes a heart.
+
+Shards wear a keeper down; its health bar sits at the top of the screen.
+Both of them are worth a payout from the road's soul purse, and the road
+only opens once the keeper is down.
 
 THE SOUL PEDDLER
 ----------------

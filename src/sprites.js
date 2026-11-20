@@ -1347,3 +1347,403 @@ export function drawDolphin(g, x, y, angle, scale = 1, alpha = 1) {
 
   g.restore();
 }
+
+// The ruined city's boss: a giant humanoid tiger, all shoulders and stripes.
+export function drawTiger(g, cx, baseY, t, opts = {}) {
+  const scale = opts.scale || 1;
+  const facing = opts.facing || -1;
+  const flash = opts.flash || 0;
+  const swipe = clamp(opts.swipe || 0, 0, 1);
+  const crouch = clamp(opts.crouch || 0, 0, 1);
+  const stomp = opts.stomp || 0;
+
+  g.save();
+  g.translate(Math.round(cx), Math.round(baseY - stomp * 2));
+  g.scale(facing * scale, scale);
+
+  // shadow under the wide stance
+  g.fillStyle = 'rgba(10,6,4,0.5)';
+  g.beginPath();
+  g.ellipse(0, 1, 32, 6, 0, 0, TAU);
+  g.fill();
+
+  const bob = Math.sin(t * 1.7) * 1.4;
+  const dip = crouch * 6;
+  const arm = swipe > 0 ? Math.sin(swipe * Math.PI) : 0;
+
+  // tail, curling behind and up
+  g.strokeStyle = '#8a4a14';
+  g.lineWidth = 6;
+  g.lineCap = 'round';
+  g.beginPath();
+  g.moveTo(-16, -30 + dip);
+  g.quadraticCurveTo(-42, -26, -44, -50 + Math.sin(t * 1.4) * 4);
+  g.stroke();
+  g.strokeStyle = '#c47c26';
+  g.lineWidth = 2;
+  g.beginPath();
+  g.moveTo(-18, -30 + dip);
+  g.quadraticCurveTo(-40, -27, -43, -48 + Math.sin(t * 1.4) * 4);
+  g.stroke();
+  g.fillStyle = '#2a1a10';
+  g.fillRect(-48, -54, 5, 4);
+
+  // legs, planted wide
+  for (const side of [-1, 1]) {
+    g.fillStyle = '#a85a18';
+    g.beginPath();
+    g.ellipse(side * 13, -12 + dip * 0.4, 8, 13, side * 0.1, 0, TAU);
+    g.fill();
+    g.fillStyle = '#c07a2c';
+    g.beginPath();
+    g.ellipse(side * 13, -14 + dip * 0.4, 6, 10, side * 0.1, 0, TAU);
+    g.fill();
+    g.fillStyle = '#3a2414';
+    g.beginPath();
+    g.ellipse(side * 15, -2, 12, 4, 0, 0, TAU);
+    g.fill();
+    g.fillStyle = '#e8dcc0';
+    for (let i = 0; i < 3; i++) g.fillRect(side * 15 - 6 + i * 5, -2, 2, 2);
+  }
+
+  // torso: heavy chest and a hunched back
+  g.fillStyle = '#b4651c';
+  g.beginPath();
+  g.ellipse(0, -40 + dip + bob, 21, 22, 0, 0, TAU);
+  g.fill();
+  g.fillStyle = '#d08634';
+  g.beginPath();
+  g.ellipse(3, -44 + dip + bob, 16, 17, 0, 0, TAU);
+  g.fill();
+  // pale belly
+  g.fillStyle = '#e8cfa4';
+  g.beginPath();
+  g.ellipse(6, -36 + dip + bob, 9, 12, 0.1, 0, TAU);
+  g.fill();
+
+  // stripes across the back and flanks
+  g.fillStyle = '#3a2210';
+  for (let i = 0; i < 4; i++) {
+    const sy = -54 + i * 8 + dip + bob;
+    g.beginPath();
+    g.moveTo(-18 + i, sy);
+    g.lineTo(-6 + i * 1.6, sy + 3);
+    g.lineTo(-18 + i, sy + 4);
+    g.closePath();
+    g.fill();
+  }
+  for (let i = 0; i < 3; i++) {
+    g.fillRect(12 + i, -50 + i * 9 + dip + bob, 3, 2);
+  }
+
+  // arms: the near one is the swipe
+  for (const side of [-1, 1]) {
+    const s = side === facing ? arm : arm * 0.35;
+    const shoulderX = side * 17;
+    const shoulderY = -54 + dip + bob;
+    const elbowX = side * (28 + s * 10);
+    const elbowY = -40 + s * 6 + dip + bob;
+    const pawX = side * (30 + s * 24);
+    const pawY = -30 - s * 20 + dip + bob;
+    g.strokeStyle = '#a85a18';
+    g.lineWidth = 9;
+    g.beginPath();
+    g.moveTo(shoulderX, shoulderY);
+    g.lineTo(elbowX, elbowY);
+    g.lineTo(pawX, pawY);
+    g.stroke();
+    g.strokeStyle = '#cf8030';
+    g.lineWidth = 5;
+    g.beginPath();
+    g.moveTo(shoulderX, shoulderY - 1);
+    g.lineTo(elbowX, elbowY - 1);
+    g.lineTo(pawX, pawY - 1);
+    g.stroke();
+    // paw and claws
+    g.fillStyle = '#d89a4c';
+    g.beginPath();
+    g.ellipse(pawX, pawY, 7, 6, 0, 0, TAU);
+    g.fill();
+    g.fillStyle = '#f4ecd6';
+    for (let i = 0; i < 3; i++) {
+      const clawX = pawX + side * (2 + i * 3);
+      g.beginPath();
+      g.moveTo(clawX, pawY - 2);
+      g.lineTo(clawX + side * 4, pawY - 7 - s * 3);
+      g.lineTo(clawX, pawY + 1);
+      g.closePath();
+      g.fill();
+    }
+  }
+
+  // head, ears, muzzle
+  const hx = 8;
+  const hy = -72 + dip + bob;
+  g.fillStyle = '#b4651c';
+  g.beginPath();
+  g.ellipse(hx, hy, 14, 12, 0, 0, TAU);
+  g.fill();
+  g.fillStyle = '#d08634';
+  g.beginPath();
+  g.ellipse(hx + 1, hy - 2, 11, 9, 0, 0, TAU);
+  g.fill();
+  for (const side of [-1, 1]) {
+    g.fillStyle = '#b4651c';
+    g.beginPath();
+    g.moveTo(hx + side * 8, hy - 8);
+    g.lineTo(hx + side * 13, hy - 20);
+    g.lineTo(hx + side * 15, hy - 6);
+    g.closePath();
+    g.fill();
+    g.fillStyle = '#3a2210';
+    g.beginPath();
+    g.moveTo(hx + side * 10, hy - 9);
+    g.lineTo(hx + side * 13, hy - 17);
+    g.lineTo(hx + side * 14, hy - 8);
+    g.closePath();
+    g.fill();
+  }
+  // stripes on the forehead
+  g.fillStyle = '#3a2210';
+  g.fillRect(hx - 6, hy - 12, 2, 5);
+  g.fillRect(hx - 2, hy - 14, 2, 6);
+  g.fillRect(hx + 2, hy - 12, 2, 5);
+  // muzzle
+  g.fillStyle = '#f0dcb4';
+  g.beginPath();
+  g.ellipse(hx + 10, hy + 3, 8, 6, 0, 0, TAU);
+  g.fill();
+  g.fillStyle = '#2a1a10';
+  g.fillRect(hx + 16, hy, 3, 2);
+  g.fillStyle = '#8a2a2a';
+  g.fillRect(hx + 12, hy + 6, 5, 1);
+  // eyes: two coals in the dark of the face
+  g.save();
+  g.globalCompositeOperation = 'lighter';
+  glow(g, hx + 7, hy - 2, 14, '#ffc46a', 0.4);
+  g.restore();
+  g.fillStyle = '#ffd47a';
+  g.fillRect(hx + 5, hy - 3, 3, 2);
+  g.fillRect(hx + 10, hy - 3, 2, 2);
+  g.fillStyle = '#1a0f08';
+  g.fillRect(hx + 6, hy - 3, 1, 2);
+  g.fillRect(hx + 10, hy - 3, 1, 2);
+
+  // whiskers
+  g.strokeStyle = 'rgba(240,228,200,0.5)';
+  g.lineWidth = 1;
+  for (let i = 0; i < 3; i++) {
+    g.beginPath();
+    g.moveTo(hx + 14, hy + 3 + i);
+    g.lineTo(hx + 26, hy + 1 + i * 3);
+    g.stroke();
+  }
+
+  if (flash > 0) {
+    g.globalCompositeOperation = 'lighter';
+    g.globalAlpha = flash * 0.45;
+    g.fillStyle = '#ffffff';
+    g.fillRect(-40, -90, 80, 90);
+  }
+  g.restore();
+}
+
+// The last bridge's keeper: a water dragon with a mouth full of blood-worms.
+export function drawWaterDragon(g, cx, baseY, t, opts = {}) {
+  const scale = opts.scale || 1;
+  const facing = opts.facing || -1;
+  const flash = opts.flash || 0;
+  const steam = clamp(opts.steam || 0, 0, 1);
+  const bite = clamp(opts.bite || 0, 0, 1);
+
+  g.save();
+  g.translate(Math.round(cx), Math.round(baseY));
+  g.scale(facing * scale, scale);
+
+  // water shadow under the body
+  g.fillStyle = 'rgba(4,18,22,0.45)';
+  g.beginPath();
+  g.ellipse(0, 1, 40, 5, 0, 0, TAU);
+  g.fill();
+
+  const sway = Math.sin(t * 1.6) * 3;
+  const jaw = 2 + bite * 5 + steam * 3;
+
+  // the long tail, trailing off behind
+  g.strokeStyle = '#123a40';
+  g.lineWidth = 10;
+  g.lineCap = 'round';
+  g.beginPath();
+  g.moveTo(-22, -24);
+  g.quadraticCurveTo(-56, -20 + sway, -70, -40 + sway);
+  g.stroke();
+  g.strokeStyle = '#1d5a60';
+  g.lineWidth = 5;
+  g.beginPath();
+  g.moveTo(-24, -25);
+  g.quadraticCurveTo(-55, -21 + sway, -68, -39 + sway);
+  g.stroke();
+  // fluke
+  g.fillStyle = '#0d2c33';
+  g.beginPath();
+  g.moveTo(-68, -40 + sway);
+  g.lineTo(-84, -52 + sway);
+  g.lineTo(-78, -38 + sway);
+  g.lineTo(-86, -26 + sway);
+  g.closePath();
+  g.fill();
+  // dorsal spines
+  g.fillStyle = '#bfe9e6';
+  for (let i = 0; i < 5; i++) {
+    const sx = -54 + i * 11;
+    const sy = -30 + Math.sin(i * 0.8) * 2 + (i > 2 ? -2 : 0);
+    g.beginPath();
+    g.moveTo(sx, sy);
+    g.lineTo(sx + 3, sy - 9 - (i % 2) * 3);
+    g.lineTo(sx + 6, sy);
+    g.closePath();
+    g.fill();
+  }
+
+  // body, scaled and ribbed
+  g.fillStyle = '#123a40';
+  g.beginPath();
+  g.ellipse(-8, -26, 30, 16, -0.1, 0, TAU);
+  g.fill();
+  g.fillStyle = '#1d5a60';
+  g.beginPath();
+  g.ellipse(-8, -29, 26, 12, -0.1, 0, TAU);
+  g.fill();
+  g.fillStyle = '#8fc9bf';
+  g.beginPath();
+  g.ellipse(-6, -19, 24, 7, -0.06, 0, TAU);
+  g.fill();
+  g.strokeStyle = 'rgba(200,240,232,0.32)';
+  g.lineWidth = 1;
+  for (let i = 0; i < 5; i++) {
+    g.beginPath();
+    g.moveTo(-30 + i * 10, -20);
+    g.lineTo(-28 + i * 10, -33);
+    g.stroke();
+  }
+
+  // front legs gripping the planks
+  for (const side of [-1, 1]) {
+    g.strokeStyle = '#16424a';
+    g.lineWidth = 7;
+    g.beginPath();
+    g.moveTo(6 + side * 4, -20);
+    g.lineTo(12 + side * 8, -10);
+    g.lineTo(10 + side * 12, -1);
+    g.stroke();
+    g.fillStyle = '#0d2c33';
+    for (let i = 0; i < 3; i++) {
+      g.beginPath();
+      g.moveTo(10 + side * (10 + i * 2), -2);
+      g.lineTo(13 + side * (12 + i * 3), -6);
+      g.lineTo(9 + side * (11 + i * 2), 1);
+      g.closePath();
+      g.fill();
+    }
+  }
+
+  // neck and head
+  g.strokeStyle = '#155056';
+  g.lineWidth = 14;
+  g.beginPath();
+  g.moveTo(12, -32);
+  g.quadraticCurveTo(26, -44, 34, -50);
+  g.stroke();
+  g.strokeStyle = '#24707a';
+  g.lineWidth = 8;
+  g.beginPath();
+  g.moveTo(13, -34);
+  g.quadraticCurveTo(26, -45, 34, -51);
+  g.stroke();
+
+  const hx = 38;
+  const hy = -54;
+  g.fillStyle = '#155056';
+  g.beginPath();
+  g.ellipse(hx, hy, 15, 10, -0.2, 0, TAU);
+  g.fill();
+  g.fillStyle = '#24707a';
+  g.beginPath();
+  g.ellipse(hx - 1, hy - 2, 12, 7, -0.2, 0, TAU);
+  g.fill();
+  // horns and brow spines
+  g.fillStyle = '#cfeae4';
+  for (let i = 0; i < 3; i++) {
+    g.beginPath();
+    g.moveTo(hx - 8 + i * 5, hy - 7);
+    g.lineTo(hx - 10 + i * 5, hy - 17 - (i === 1 ? 4 : 0));
+    g.lineTo(hx - 4 + i * 5, hy - 8);
+    g.closePath();
+    g.fill();
+  }
+
+  // the jaw, on hinges, full of worm-teeth
+  g.fillStyle = '#0d2c33';
+  g.beginPath();
+  g.moveTo(hx + 6, hy + 3);
+  g.lineTo(hx + 26, hy + jaw + 8);
+  g.lineTo(hx + 4, hy + 10 + jaw);
+  g.closePath();
+  g.fill();
+  g.fillStyle = '#7a2a2e';
+  g.beginPath();
+  g.moveTo(hx + 6, hy + 3);
+  g.lineTo(hx + 24, hy + jaw + 6);
+  g.lineTo(hx + 6, hy + 8 + jaw);
+  g.closePath();
+  g.fill();
+
+  // blood-worm teeth: short, pink, and moving
+  for (let i = 0; i < 7; i++) {
+    const wx = hx + 7 + i * 2.6;
+    const wy = hy + 3 + jaw * 0.4 + i * 0.5;
+    g.fillStyle = i % 2 ? '#d96a72' : '#b8444c';
+    g.fillRect(Math.round(wx), Math.round(wy + Math.sin(t * 6 + i) * 0.8), 2, 4);
+    g.fillStyle = '#f0b0b4';
+    g.fillRect(Math.round(wx), Math.round(wy + Math.sin(t * 6 + i) * 0.8), 1, 1);
+  }
+  for (let i = 0; i < 5; i++) {
+    const wx = hx + 8 + i * 3;
+    const wy = hy + 12 + jaw;
+    g.fillStyle = '#c04a52';
+    g.fillRect(Math.round(wx), Math.round(wy), 2, 3);
+  }
+
+  // eye: pale, cold, unimpressed
+  g.save();
+  g.globalCompositeOperation = 'lighter';
+  glow(g, hx + 2, hy - 1, 16, '#8fe0d8', 0.4 + steam * 0.4);
+  g.restore();
+  g.fillStyle = '#dff7f2';
+  g.fillRect(hx, hy - 2, 4, 2);
+  g.fillStyle = '#0a2226';
+  g.fillRect(hx + 1, hy - 2, 1, 2);
+
+  // steam gathering in the throat
+  if (steam > 0) {
+    g.save();
+    g.globalCompositeOperation = 'lighter';
+    glow(g, hx + 14, hy + 8, 10 + steam * 16, '#dff8f4', 0.3 + steam * 0.45);
+    for (let i = 0; i < 12; i++) {
+      const a = Math.random() * TAU;
+      const r = 2 + Math.random() * (6 + steam * 12);
+      g.globalAlpha = 0.35 + steam * 0.45;
+      g.fillStyle = i % 3 ? '#cfeae4' : '#ffffff';
+      g.fillRect(Math.round(hx + 14 + Math.cos(a) * r), Math.round(hy + 8 + Math.sin(a) * r), 2, 2);
+    }
+    g.restore();
+  }
+
+  if (flash > 0) {
+    g.globalCompositeOperation = 'lighter';
+    g.globalAlpha = flash * 0.45;
+    g.fillStyle = '#ffffff';
+    g.fillRect(-70, -72, 120, 74);
+  }
+  g.restore();
+}

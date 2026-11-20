@@ -4,7 +4,8 @@ import {
   W, H, TAU, clamp, lerp, damp, rgba, mix, vgrad, glow, disc, makeCanvas, hash1,
 } from './util.js';
 import { drawText, wrapText, textWidth } from './font.js';
-import { GIRL, GIRL_SIT, drawGuardian, drawWisp, drawTeen, drawShield, drawDog, drawCrab, drawScorpion, drawSpider, drawSnowGiant, drawDolphin } from './sprites.js';
+import { GIRL, GIRL_SIT, drawGuardian, drawWisp, drawTeen, drawShield, drawDog, drawCrab, drawScorpion, drawSpider, drawSnowGiant, drawDolphin,
+  drawTiger, drawWaterDragon } from './sprites.js';
 import { buildLevel, buildCityScene, groundAt, TOTAL_MEMORIES, LEVEL_COUNT } from './levels.js';
 import { AudioEngine } from './audio.js';
 import { Input } from './input.js';
@@ -633,7 +634,12 @@ export class Game {
       gd.hoverCur = damp(gd.hoverCur, gd.hover, 4, dt);
       const targetY = gy - gd.hoverCur + Math.sin(this.time * 0.9 + gd.phase) * 2.2;
       gd.y = damp(gd.y, targetY, 3.2, dt);
-      gd.lean = damp(gd.lean, 0, 5, dt);
+      // While a boss is on its feet both knights keep their eyes on it,
+      // whichever way the girl runs.
+      const focusBoss = this.combat && this.combat.boss
+        && this.combat.boss.active && this.combat.boss.alive ? this.combat.boss : null;
+      const leanTo = focusBoss ? (focusBoss.x > gd.x ? 8 : -8) : 0;
+      gd.lean = damp(gd.lean, leanTo, 5, dt);
 
       // shadow wisps trailing off the guardians
       gd.ember -= dt;
@@ -1897,7 +1903,6 @@ export class Game {
       hp: 6,
       maxHp: 6,
       alive: true,
-      immune: true,
       doomed: false,
       flash: 0,
       biteCd: 0.4 + i * 0.19,
@@ -1924,15 +1929,29 @@ export class Game {
     }));
     const cfg = L.boss;
     const kind = cfg && cfg.kind ? cfg.kind : 'scorpion';
+    const BOSS_HP = { giant: 240, tiger: 200, dragon: 160, scorpion: 160 };
+    const BOSS_NAME = {
+      giant: 'THE SNOW GIANT', tiger: 'THE TIGER OF THE RUINS',
+      dragon: 'THE WATER DRAGON', scorpion: 'THE SCORPION',
+    };
+    const BOSS_SUBTITLE = {
+      giant: 'THE PASS ITSELF', tiger: 'WHAT THE FIRE LEFT BEHIND',
+      dragon: 'KEEPER OF THE LAST BRIDGE', scorpion: 'THE OLD KEEPER OF THE DUNES',
+    };
+    const BOSS_COLOR = {
+      giant: '#b9dff2', tiger: '#e8a34a', dragon: '#8fe0d8', scorpion: '#d28a52',
+    };
+    const homeBridge = cfg && kind === 'dragon' && L.bridges
+      ? L.bridges[cfg.bridge ?? L.bridges.length - 1] : null;
     const boss = cfg ? {
       id: kind,
       kind,
-      name: cfg.name || (kind === 'giant' ? 'THE SNOW GIANT' : 'THE SCORPION'),
-      subtitle: cfg.subtitle || (kind === 'giant' ? 'THE PASS ITSELF' : 'THE OLD KEEPER OF THE DUNES'),
-      color: cfg.color || (kind === 'giant' ? '#b9dff2' : '#d28a52'),
+      name: cfg.name || BOSS_NAME[kind],
+      subtitle: cfg.subtitle || BOSS_SUBTITLE[kind],
+      color: cfg.color || BOSS_COLOR[kind],
       x: cfg.x,
-      hp: cfg.hp || (kind === 'giant' ? 240 : 160),
-      maxHp: cfg.hp || (kind === 'giant' ? 240 : 160),
+      hp: cfg.hp || BOSS_HP[kind],
+      maxHp: cfg.hp || BOSS_HP[kind],
       alive: true,
       active: false,
       intro: 0,
@@ -1951,6 +1970,21 @@ export class Game {
       slamHit: true,
       facing: -1,
       stomp: 0,
+      // the tiger crouches and pounces; the dragon hops its bridge and breathes
+      pounceT: 0,
+      pounceMax: 0.55,
+      pounceX: cfg.x,
+      baseY: homeBridge ? homeBridge.y : null,
+      jumpT: 0,
+      jumpMax: 1.0,
+      jumpFrom: cfg.x,
+      jumpTo: cfg.x,
+      lift: 0,
+      hops: 0,
+      steamT: 0,
+      steamMax: 0.75,
+      steamHit: true,
+      steamBurst: 0,
     } : null;
     // Her life is hers for the whole road: a new stage does not mend her.
     this.lifeMax = 100;
@@ -2100,10 +2134,7 @@ export class Game {
         spider.x += spider.dir * 180 * dt;
         if (!spider.lungeHit && Math.abs(p.x - spider.x) < 22 && Math.abs(p.y - gy) < 30) {
           spider.lungeHit = true;
-          if (this.hurtWilds(8, spider.x)) {
-            this.audio.play('spiderBite');
-            this.guardianAnswer(spider);
-          }
+          if (this.hurtWilds(8, spider.x)) this.audio.play('spiderBite');
           spider.biteCd = 1.25;
         }
       } else if (close) {
@@ -2111,10 +2142,7 @@ export class Game {
         spider.dir = Math.sign(dx) || spider.dir;
         if (Math.abs(dx) < 26) {
           if (spider.biteCd <= 0) {
-            if (this.hurtWilds(8, spider.x)) {
-              this.audio.play('spiderBite');
-              this.guardianAnswer(spider);
-            }
+            if (this.hurtWilds(8, spider.x)) this.audio.play('spiderBite');
             spider.biteCd = 1.25;
           }
         } else if (Math.abs(dx) < 92 && spider.lungeCd <= 0) {
@@ -2145,9 +2173,7 @@ export class Game {
       beam.x = beam.target.x;
       if (!beam.hit && beam.t >= 0.13 && beam.target.alive) {
         beam.hit = true;
-        this.damageWilds(
-          beam.target, 999, beam.x, groundAt(L, beam.x) - 18, true,
-        );
+        this.damageWilds(beam.target, 999, beam.x, groundAt(L, beam.x) - 18);
       }
     }
     c.guardianLasers = c.guardianLasers.filter((beam) => beam.t < beam.dur);
@@ -2155,6 +2181,8 @@ export class Game {
 
     if (c.boss && c.boss.active && c.boss.alive) {
       if (c.boss.kind === 'giant') this.updateGiant(dt);
+      else if (c.boss.kind === 'tiger') this.updateTiger(dt);
+      else if (c.boss.kind === 'dragon') this.updateDragon(dt);
       else this.updateScorpion(dt);
     }
 
@@ -2182,7 +2210,7 @@ export class Game {
       shard.life += dt;
       const target = shard.target;
       if (!target || !target.alive || shard.life > 2.0) continue;
-      const ty = groundAt(L, target.x) - (target === c.boss ? (c.boss.kind === 'giant' ? 48 : 28) : 9);
+      const ty = target === c.boss ? this.bossAimY(c.boss) : groundAt(L, target.x) - 9;
       const dx = target.x - shard.x;
       const dy = ty - shard.y;
       const len = Math.max(1, Math.hypot(dx, dy));
@@ -2344,6 +2372,171 @@ export class Game {
     }
   }
 
+  // The ruined city's tiger: a giant on two legs. It closes the distance
+  // fast, swipes with one paw, and now and then leaps onto the ground where
+  // she is standing.
+  updateTiger(dt) {
+    const c = this.combat;
+    const b = c.boss;
+    const L = this.level;
+    const p = this.player;
+    b.flash = Math.max(0, b.flash - dt * 3.8);
+    b.stomp = Math.max(0, b.stomp - dt);
+    b.intro = Math.max(0, b.intro - dt);
+    b.x = clamp(b.x, L.boss.arenaMin + 24, Math.min(L.boss.arenaMax - 24, L.width - 42));
+    b.y = groundAt(L, b.x);
+    b.facing = Math.sign(p.x - b.x) || b.facing;
+    if (b.intro > 0) return;
+
+    if (b.clawT > 0) {
+      b.clawT = Math.max(0, b.clawT - dt);
+      if (b.clawT <= 0 && !b.clawHit) {
+        b.clawHit = true;
+        b.stomp = 0.35;
+        const hit = Math.abs(p.x - b.x) < 96 && Math.abs(p.y - b.y) < 34;
+        if (hit) this.hurtWilds(14, b.x);
+        this.audio.play('scorpionClaw');
+      }
+      return;
+    }
+    if (b.pounceT > 0) {
+      b.pounceT = Math.max(0, b.pounceT - dt);
+      const k = 1 - b.pounceT / b.pounceMax;
+      b.x = lerp(b.x, b.pounceX, Math.min(1, dt * 7));
+      b.lift = Math.sin(k * Math.PI) * 26;
+      if (b.pounceT <= 0) {
+        b.lift = 0;
+        b.stomp = 0.6;
+        const hit = Math.abs(p.x - b.x) < 52 && Math.abs(p.y - b.y) < 40;
+        if (hit) this.hurtWilds(16, b.x);
+        this.audio.play('maceSlam');
+        for (let i = 0; i < 18; i++) {
+          const side = i % 2 ? 1 : -1;
+          this.spawn({
+            type: 'spark',
+            x: b.x + side * (2 + Math.random() * 18),
+            y: groundAt(L, b.x) - 2,
+            vx: side * (26 + Math.random() * 62),
+            vy: -10 - Math.random() * 30,
+            size: i % 4 ? 1 : 2,
+            color: i % 2 ? '#c88a4a' : '#f0dcc0',
+            max: 0.4 + Math.random() * 0.45,
+            grav: 60,
+            drag: 0.94,
+          });
+        }
+        b.attackCd = 1.05;
+      }
+      return;
+    }
+
+    const dx = p.x - b.x;
+    const ad = Math.abs(dx);
+    b.lift = 0;
+    // It stalks her: a walk when far, a charge when the gap opens up.
+    if (ad > 70) b.x += Math.sign(dx) * (ad > 220 ? 118 : 62) * dt;
+    if (ad < 60 && c.invuln <= 0 && Math.abs(p.y - b.y) < 36) this.hurtWilds(11, b.x);
+
+    b.attackCd -= dt;
+    if (b.attackCd <= 0) {
+      if (ad < 118) {
+        b.clawT = b.clawMax;
+        b.clawHit = false;
+        this.audio.play('spiderHiss');
+      } else {
+        b.pounceT = b.pounceMax;
+        b.pounceX = clamp(p.x, L.boss.arenaMin + 20, Math.min(L.boss.arenaMax - 20, L.width - 20));
+        this.audio.play('spiderHiss');
+      }
+      b.attackCd = 1.6 + Math.random() * 0.9;
+    }
+  }
+
+  // The last bridge's water dragon. It vaults from one end of the bridge to
+  // the other, and after every second landing it lets out a Steam Blast that
+  // costs her an eighth of her life wherever she stands on the bridge.
+  updateDragon(dt) {
+    const c = this.combat;
+    const b = c.boss;
+    const L = this.level;
+    const p = this.player;
+    const bridge = L.bridges && L.bridges[b.bridge ?? -1];
+    const sideL = bridge ? bridge.x + 26 : L.boss.arenaMin + 40;
+    const sideR = bridge ? bridge.x + bridge.w - 26 : L.boss.arenaMax - 40;
+    if (bridge) b.baseY = bridge.y;
+    b.flash = Math.max(0, b.flash - dt * 3.8);
+    b.stomp = Math.max(0, b.stomp - dt);
+    b.intro = Math.max(0, b.intro - dt);
+    b.steamBurst = Math.max(0, (b.steamBurst || 0) - dt);
+    b.facing = Math.sign(p.x - b.x) || b.facing;
+    if (b.intro > 0) return;
+
+    // The blast gathers in its throat, then goes off along the whole bridge.
+    if (b.steamT > 0) {
+      b.steamT = Math.max(0, b.steamT - dt);
+      b.lift = 0;
+      if (b.steamT <= 0 && !b.steamHit) {
+        b.steamHit = true;
+        b.steamBurst = 0.55;
+        this.audio.play('blast');
+        for (let i = 0; i < 34; i++) {
+          const a = Math.random() * TAU;
+          const sp = 20 + Math.random() * 78;
+          this.spawn({
+            type: i % 3 ? 'smoke' : 'mote',
+            x: b.x + (Math.random() - 0.5) * 40,
+            y: b.baseY - 52 - Math.random() * 10,
+            vx: Math.cos(a) * sp,
+            vy: Math.sin(a) * sp * 0.6 - 8,
+            size: 2 + Math.floor(Math.random() * 3),
+            color: i % 2 ? '#dff8f4' : '#ffffff',
+            max: 0.5 + Math.random() * 0.6,
+            alpha: 0.34,
+            drag: 0.94,
+          });
+        }
+        // An eighth of her: the blast is not something she can shrug off.
+        if (Math.abs(p.x - b.x) < 300) this.hurtWilds(13, b.x);
+      }
+      return;
+    }
+
+    if (b.jumpT > 0) {
+      b.jumpT = Math.max(0, b.jumpT - dt);
+      const k = 1 - b.jumpT / b.jumpMax;
+      b.x = lerp(b.jumpFrom, b.jumpTo, k);
+      b.lift = Math.sin(k * Math.PI) * 62;
+      if (b.jumpT <= 0) {
+        b.lift = 0;
+        b.stomp = 0.4;
+        b.hops = (b.hops || 0) + 1;
+        // Every second crossing, the steam comes out.
+        if (b.hops % 2 === 0) {
+          b.steamT = b.steamMax;
+          b.steamHit = false;
+          this.audio.play('blueCharge');
+        }
+        b.attackCd = 0.85;
+      }
+      return;
+    }
+
+    b.lift = 0;
+    const dx = p.x - b.x;
+    // Anything standing under it gets bitten.
+    if (Math.abs(dx) < 56 && c.invuln <= 0 && Math.abs(p.y - b.baseY) < 42) {
+      this.hurtWilds(9, b.x);
+    }
+    b.attackCd -= dt;
+    if (b.attackCd <= 0) {
+      const mid = (sideL + sideR) * 0.5;
+      b.jumpFrom = b.x;
+      b.jumpTo = b.x < mid ? sideR : sideL;
+      b.jumpT = b.jumpMax = 0.95;
+      this.audio.play('jump');
+    }
+  }
+
   hurtWilds(amount, sourceX) {
     const c = this.combat;
     if (!c || c.invuln > 0 || this.mode === 'ending') return false;
@@ -2372,10 +2565,6 @@ export class Game {
     }
     if (c.hp <= 0) this.showWildsDown();
     return true;
-  }
-
-  guardianAnswer(spider) {
-    this.guardianStrike(spider);
   }
 
   // One guardian, one bot, one answer. Anything alive that is not the boss.
@@ -2427,8 +2616,11 @@ export class Game {
     const c = this.combat;
     if (!c) return;
     const p = this.player;
-    let target = null;
-    let best = 430;
+    // While a boss stands, every shard is already turned toward it, whichever
+    // way the girl happens to be facing.
+    const bossFocus = c.boss && c.boss.active && c.boss.alive ? c.boss : null;
+    let target = bossFocus;
+    let best = bossFocus ? Infinity : 430;
     for (const dog of c.dogs) {
       if (!dog.alive) continue;
       const d = Math.abs(dog.x - p.x);
@@ -2462,7 +2654,7 @@ export class Game {
     for (let i = 0; i < 3; i++) {
       const sx = p.x + p.facing * 8;
       const sy = p.y - 20 + (i - 1) * 3;
-      const ty = groundAt(this.level, target.x) - (target === c.boss ? (c.boss.kind === 'giant' ? 48 : 28) : 9);
+      const ty = target === c.boss ? this.bossAimY(c.boss) : groundAt(this.level, target.x) - 9;
       const dx = target.x - sx;
       const dy = ty - sy;
       const len = Math.max(1, Math.hypot(dx, dy));
@@ -2498,59 +2690,54 @@ export class Game {
     if (!c) return;
     const L = this.level;
     const p = this.player;
+    // While a boss stands the beam is locked on it: whichever way she runs or
+    // faces, the knights' light reaches the boss from every side.
+    const bossFocus = !!(c.boss && c.boss.active && c.boss.alive);
     const dir = p.facing || 1;
     const beamY = groundAt(L, p.x) - 40;
+    const inLine = (x) => {
+      if (bossFocus) return Math.abs(x - p.x) < 620;
+      const ahead = (x - p.x) * dir;
+      return ahead > -10 && ahead < 430;
+    };
+    const inBand = (y) => bossFocus || Math.abs(y - beamY) < 58;
     for (const dog of c.dogs) {
       if (!dog.alive) continue;
-      const ahead = (dog.x - p.x) * dir;
-      if (ahead > -10 && ahead < 430 && Math.abs(groundAt(L, dog.x) - 22 - beamY) < 58) {
+      if (inLine(dog.x) && inBand(groundAt(L, dog.x) - 22)) {
         this.damageWilds(dog, 6, dog.x, groundAt(L, dog.x) - 9);
       }
     }
     for (const spider of c.spiders) {
       if (!spider.alive) continue;
-      const ahead = (spider.x - p.x) * dir;
-      if (ahead > -10 && ahead < 430 && Math.abs(groundAt(L, spider.x) - 17 - beamY) < 58) {
+      if (inLine(spider.x) && inBand(groundAt(L, spider.x) - 17)) {
         this.damageWilds(spider, 6, spider.x, groundAt(L, spider.x) - 15);
       }
     }
     for (const crab of c.crabs) {
       if (!crab.alive) continue;
-      const ahead = (crab.x - p.x) * dir;
-      if (ahead > -10 && ahead < 430 && Math.abs(groundAt(L, crab.x) - 12 - beamY) < 58) {
+      if (inLine(crab.x) && inBand(groundAt(L, crab.x) - 12)) {
         this.damageWilds(crab, 6, crab.x, groundAt(L, crab.x) - 10);
       }
     }
-    if (c.boss && c.boss.active && c.boss.alive) {
-      const ahead = (c.boss.x - p.x) * dir;
-      const bossH = c.boss.kind === 'giant' ? 48 : 32;
-      if (ahead > -10 && ahead < 540 && Math.abs(groundAt(L, c.boss.x) - bossH - beamY) < 76) {
-        this.damageWilds(c.boss, 3, c.boss.x - 12, groundAt(L, c.boss.x) - bossH);
-      }
+    if (bossFocus && Math.abs(c.boss.x - p.x) < 620) {
+      this.damageWilds(c.boss, 3, c.boss.x - 12, this.bossAimY(c.boss));
     }
   }
 
-  damageWilds(target, amount, hitX, hitY, byGuardian = false) {
-    if (!target || !target.alive) return false;
-    if (target.immune && !byGuardian) {
-      for (let i = 0; i < 5; i++) {
-        const a = Math.random() * TAU;
-        const sp = 8 + Math.random() * 26;
-        this.spawn({
-          type: 'spark',
-          x: hitX,
-          y: hitY,
-          vx: Math.cos(a) * sp,
-          vy: Math.sin(a) * sp - 6,
-          size: 1,
-          color: i % 2 ? '#dff3ff' : '#ffffff',
-          max: 0.2 + Math.random() * 0.2,
-          grav: 16,
-          drag: 0.92,
-        });
-      }
-      return false;
+  // Where a shard or a beam should land on a boss, whatever kind it is.
+  bossAimY(boss) {
+    if (!boss) return 0;
+    const L = this.level;
+    if (boss.kind === 'dragon') {
+      return (boss.baseY ?? groundAt(L, boss.x)) - 30 - (boss.lift || 0);
     }
+    if (boss.kind === 'giant') return groundAt(L, boss.x) - 48;
+    if (boss.kind === 'tiger') return groundAt(L, boss.x) - 34;
+    return groundAt(L, boss.x) - 28;
+  }
+
+  damageWilds(target, amount, hitX, hitY) {
+    if (!target || !target.alive) return false;
     const c = this.combat;
     const boss = c && target === c.boss;
     target.hp = Math.max(0, target.hp - amount);
@@ -2609,6 +2796,8 @@ export class Game {
     this.audio.setBeam(false);
     c.shards.length = 0;
     const giant = b.kind === 'giant';
+    const tiger = b.kind === 'tiger';
+    const dragon = b.kind === 'dragon';
     this.audio.play('blast');
     for (let i = 0; i < 64; i++) {
       const a = Math.random() * TAU;
@@ -2640,7 +2829,11 @@ export class Game {
         title: b.name || 'THE SCORPION',
         text: giant
           ? 'The snow giant kneels, and the pass is quiet. The way north is open.'
-          : 'It folds its legs and becomes part of the sand. The way south is open.',
+          : tiger
+            ? 'The tiger lies down in the ash, and the ruins are only ruins again. The last street waits past the end of this one.'
+            : dragon
+              ? 'The water dragon slides through its own bridge, and the steam goes out of the world. The far cliffs are open.'
+              : 'It folds its legs and becomes part of the sand. The way south is open.',
         color: b.color || '#e0a060',
         t: 0,
         typed: 0,
@@ -2685,6 +2878,14 @@ export class Game {
           'THE DUNES TAKE HER WEIGHT, AND THEN THEY TAKE THE REST.',
           'THE BLACK DOGS ARE ALREADY GONE. THE SCORPION IS STILL WAITING.',
           'THE MAINLAND WILL KEEP HER THIS TIME.',
+        ],
+      },
+      village: {
+        name: 'THE LOST CIVILIZATION',
+        lines: [
+          'THE TIGER COMES OUT OF THE SMOKE ON TWO LEGS.',
+          'THE ASH SETTLES OVER HER WITHOUT A SOUND.',
+          'THE RUINS WILL KEEP HER THIS TIME.',
         ],
       },
       cliffs: {
@@ -3902,6 +4103,49 @@ export class Game {
             g.stroke();
             g.restore();
           }
+        } else if (boss.kind === 'tiger') {
+          drawTiger(g, bx, groundAt(L, boss.x), this.time, {
+            scale: 1.14,
+            facing: boss.facing,
+            flash: boss.flash,
+            swipe: boss.clawT > 0 ? 1 - boss.clawT / boss.clawMax : 0,
+            crouch: boss.pounceT > 0 ? 1 : 0,
+            stomp: boss.stomp,
+          });
+          if (boss.clawT > 0) {
+            const k = clamp(1 - boss.clawT / boss.clawMax, 0, 1);
+            const my = groundAt(L, boss.x) - 2;
+            g.save();
+            g.globalCompositeOperation = 'lighter';
+            g.globalAlpha = 0.22 + k * 0.5;
+            g.strokeStyle = '#ffcf8e';
+            g.lineWidth = 2;
+            g.beginPath();
+            g.ellipse(bx + boss.facing * 46, my - 22, 40 + k * 26, 30, 0, -0.9, 0.9);
+            g.stroke();
+            g.restore();
+          }
+        } else if (boss.kind === 'dragon') {
+          drawWaterDragon(g, bx, (boss.baseY ?? groundAt(L, boss.x)) - (boss.lift || 0), this.time, {
+            scale: 1.06,
+            facing: boss.facing,
+            flash: boss.flash,
+            steam: boss.steamT > 0 ? 1 - boss.steamT / boss.steamMax : 0,
+            bite: boss.jumpT > 0 ? 1 : 0,
+          });
+          // the blast itself: a wall of steam coming off the bridge
+          if (boss.steamBurst > 0) {
+            const k = 1 - clamp(boss.steamBurst / 0.55, 0, 1);
+            const my = (boss.baseY ?? groundAt(L, boss.x)) - 30;
+            g.save();
+            g.globalCompositeOperation = 'lighter';
+            for (let i = 0; i < 3; i++) {
+              g.globalAlpha = (1 - k) * (0.3 - i * 0.07);
+              g.fillStyle = '#dff8f4';
+              g.fillRect(bx - 60 - k * 200 - i * 16, my - 26 - i * 6, 120 + k * 400, 48 + i * 10);
+            }
+            g.restore();
+          }
         } else {
           drawScorpion(g, bx, groundAt(L, boss.x), this.time, {
             scale: 1.08,
@@ -4070,6 +4314,44 @@ export class Game {
     const p = this.player;
     const dir = c.beamDir || 1;
     const xs = this.guardians.map((gd) => gd.x - this.cam.x + 10);
+    const focus = c.boss && c.boss.active && c.boss.alive ? c.boss : null;
+    if (focus) {
+      // No facing, no corridor: every knight fires at the boss from wherever
+      // it is, so the light reaches it from every side at once.
+      const bx = focus.x - this.cam.x;
+      const by = this.bossAimY(focus);
+      const oy = p.y - 40;
+      g.save();
+      g.globalCompositeOperation = 'lighter';
+      for (const gx2 of xs) {
+        g.globalAlpha = 0.22;
+        g.strokeStyle = '#9fc8ff';
+        g.lineWidth = 9;
+        g.beginPath();
+        g.moveTo(gx2, oy);
+        g.lineTo(bx, by);
+        g.stroke();
+        g.globalAlpha = 0.8;
+        g.strokeStyle = '#eaf7ff';
+        g.lineWidth = 3;
+        g.beginPath();
+        g.moveTo(gx2, oy);
+        g.lineTo(bx, by);
+        g.stroke();
+        g.globalAlpha = 1;
+        g.strokeStyle = '#ffffff';
+        g.lineWidth = 1;
+        g.beginPath();
+        g.moveTo(gx2, oy);
+        g.lineTo(bx, by);
+        g.stroke();
+      }
+      glow(g, bx, by, 40, '#e8f7ff', 0.7);
+      g.fillStyle = '#ffffff';
+      g.fillRect(Math.round(bx - 3), Math.round(by - 3), 6, 6);
+      g.restore();
+      return;
+    }
     const gx = dir > 0 ? Math.min(...xs) : Math.max(...xs);
     const ex = dir > 0 ? W + 30 : -30;
     const x0 = Math.min(gx, ex);
@@ -4150,17 +4432,16 @@ export class Game {
       || c.spiders.some((spider) => spider.alive)
       || c.crabs.some((crab) => crab.alive)
       || (boss && boss.alive);
-    const spiderOnly = c.spiders.some((spider) => spider.alive)
-      && !c.dogs.some((dog) => dog.alive)
-      && !c.crabs.some((crab) => crab.alive)
-      && !(boss && boss.alive);
+    const touch = typeof window !== 'undefined' && !!window.__touchButtons;
     const hint = bossAlive
-      ? 'W JUMP   SHIFT DASH   X SHARDS   C KNIGHTS\' BEAM'
-      : spiderOnly
-        ? 'X / C CANNOT CUT THEM - LET THE SPIDER STRIKE'
-        : hasFoes
-          ? 'X SHARDS   C KNIGHTS\' BEAM   W JUMP'
-          : 'THE WAY IS OPEN';
+      ? (touch
+        ? 'X SHARDS   C BEAM - BOTH TURN TO THE BOSS'
+        : 'W JUMP   SHIFT DASH   X SHARDS   C KNIGHTS\' BEAM')
+      : hasFoes
+        ? (touch
+          ? 'X SHARDS   C KNIGHTS\' BEAM   HOLD DASH TO RUN'
+          : 'X SHARDS   C KNIGHTS\' BEAM   W JUMP')
+        : 'THE WAY IS OPEN';
     drawText(g, hint, W / 2, H - 16, {
       align: 'center', color: bossAlive ? '#f0d4b0' : '#e2d4c0', scale: 1, spacing: 1, shadow: '#000000',
     });
@@ -4895,12 +5176,22 @@ export class Game {
       const a = clamp(this.hintT < 7 ? 1 : 9 - this.hintT, 0, 1) * 0.85;
       g.save();
       g.globalAlpha = a;
-      drawText(g, 'A D WALK   W JUMP   HOLD SHIFT TO RUN', W / 2, H - 38, {
-        align: 'center', color: '#b8b0c4', scale: 1,
-      });
-      drawText(g, 'E REMEMBER   RUNNING SPENDS HER BREATH', W / 2, H - 27, {
-        align: 'center', color: '#8d869f', scale: 1,
-      });
+      // Phones have no Shift key: the touch build names the button instead.
+      const touch = typeof window !== 'undefined' && !!window.__touchButtons;
+      drawText(
+        g,
+        touch ? 'LEFT  RIGHT  WALK   UP  JUMP   DASH  RUN'
+          : 'A D WALK   W JUMP   HOLD SHIFT TO RUN',
+        W / 2, H - 38,
+        { align: 'center', color: '#b8b0c4', scale: 1 },
+      );
+      drawText(
+        g,
+        touch ? 'HOLD THE DASH BUTTON TO RUN - IT SPENDS HER BREATH'
+          : 'E REMEMBER   RUNNING SPENDS HER BREATH',
+        W / 2, H - 27,
+        { align: 'center', color: '#8d869f', scale: 1 },
+      );
       g.restore();
     }
 

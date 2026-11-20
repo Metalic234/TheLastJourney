@@ -42,6 +42,9 @@ int main(int argc, char **argv) {
   int shop_visits = 0;
   int in_shop = 0; /* the run starts at the stall */
   int hp_at_stage[3] = { 0, 0, 0 };
+  int seen_stage = -1;
+  int boss_kind[3] = { 0, 0, 0 };
+  int boss_hp[3] = { 0, 0, 0 };
 
   game_init();
 
@@ -90,9 +93,29 @@ int main(int argc, char **argv) {
     in.right = 1;
     /* jump when a pit is just ahead, otherwise hop now and then */
     if (game_ground_at(game_player_x() + 20.0f) > 300.0f && (f % 2) == 0) in.jump = 1;
-    in.action = (f % 20) == 0 ? 1 : 0;
+    /* Keep the shards coming: a keeper needs a dozen of them. */
+    in.action = (f % 6) == 0 ? 1 : 0;
+
+    if (game_stage() != seen_stage) {
+      if (seen_stage >= 0) {
+        printf("left stage %d: boss kind %d at %d hp, hp %d/%d\n",
+               seen_stage, boss_kind[seen_stage], boss_hp[seen_stage],
+               game_hp(), game_max_hp());
+      }
+      seen_stage = game_stage();
+    }
+    boss_kind[game_stage()] = game_boss_kind();
+    boss_hp[game_stage()] = game_boss_hp();
 
     game_update(dt, in);
+    {
+      static int last_state = -1;
+      if (game_state() == 2 && last_state != 2) {
+        printf("died on stage %d at x %.0f (boss kind %d hp %d)\n",
+               game_stage(), game_player_x(), game_boss_kind(), game_boss_hp());
+      }
+      last_state = game_state();
+    }
     if ((f % 240) == 0) write_ppm(dir, f);
     if (game_finished()) {
       printf("finished at frame %d (stage %d)\n", f, game_stage());
@@ -105,5 +128,11 @@ int main(int argc, char **argv) {
          game_total_memories(), shop_visits, game_stamina(), game_finished());
   printf("hp at stage II %d, at stage III %d\n", hp_at_stage[1], hp_at_stage[2]);
   printf("auto_kill=%d bots_killed=%d\n", game_auto_kill(), game_bots_killed());
+  if (seen_stage >= 0) {
+    boss_kind[seen_stage] = game_boss_kind();
+    boss_hp[seen_stage] = game_boss_hp();
+  }
+  printf("bosses: stage1 kind %d hp %d, stage2 kind %d hp %d\n",
+         boss_kind[1], boss_hp[1], boss_kind[2], boss_hp[2]);
   return 0;
 }

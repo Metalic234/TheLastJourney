@@ -16,11 +16,11 @@
 
 #define W GAME_W
 #define H GAME_H
-#define MAX_SPIDERS 8
+#define MAX_SPIDERS 10
 #define MAX_SHARDS 10
 #define MAX_MEM 4
 #define GND_STEP 2
-#define GND_MAX 1024
+#define GND_MAX 1600
 
 static uint16_t fb[W * H];
 
@@ -43,17 +43,17 @@ typedef struct {
 
 static const StageCfg STAGES[3] = {
   {
-    "THE ENCHANTED FOREST", 1500.0f, 2,
+    "THE ENCHANTED FOREST", 2100.0f, 2,
     { { 640, 686 }, { 1080, 1126 } },
     0x101A33, 0x51708F, 0x18301F, 0x24452C, 0x2A1E14, 0x4C7A3A, 0x1B120C
   },
   {
-    "THE DROWNED RUINS", 1700.0f, 3,
+    "THE DROWNED RUINS", 2400.0f, 3,
     { { 520, 566 }, { 900, 946 }, { 1320, 1366 } },
     0x1C1226, 0x7A4A5A, 0x261E33, 0x392C46, 0x2E2836, 0x67607A, 0x1A1620
   },
   {
-    "THE BURNING CITY", 1900.0f, 4,
+    "THE BURNING CITY", 2700.0f, 4,
     { { 430, 476 }, { 760, 806 }, { 1150, 1196 }, { 1560, 1606 } },
     0x160B10, 0x8A3A26, 0x24161A, 0x3B2020, 0x2A1A18, 0x8A4A2A, 0x140C0A
   },
@@ -101,6 +101,23 @@ static int spider_n;
 static Memory mems[MAX_MEM];
 static int mem_n, mem_taken;
 static Shard shards[MAX_SHARDS];
+
+/* ---- the two keepers -------------------------------------------------- */
+/* Stage one ends with the tiger of the ruins, the last road with the water
+ * dragon. 0 = no boss on the road. */
+static const int BOSS_KIND[3] = { 0, 1, 2 };
+
+typedef struct {
+  int kind;              /* 1 tiger, 2 dragon */
+  float x, home, base_y;
+  int hp, max_hp, alive, active, facing;
+  float intro, cd, claw_t, pounce_t, pounce_x;
+  float hop_t, hop_from, hop_to, lift, steam_t, steam_burst;
+  int hops;
+  float flash;
+} Boss;
+
+static Boss boss;
 
 static float cam;
 static int state; /* 0 play, 1 clear, 2 dead, 3 end, 4 shop */
@@ -158,6 +175,7 @@ static int roll_souls(void) {
 
 /* ---- helpers ----------------------------------------------------------- */
 static void mem_str(char *b, int n);
+static void draw_boss(void);
 
 static float clampf(float v, float a, float b) {
   return v < a ? a : (v > b ? b : v);
@@ -350,14 +368,16 @@ static void reset_stage(int idx) {
     }
   }
 
-  spider_n = 3 + idx;
+  spider_n = 5 + idx;
   if (spider_n > MAX_SPIDERS) spider_n = MAX_SPIDERS;
   /* the purse for this road, filled before she takes a step */
   purse = 35 + rand() % 46;
   purse_start = purse;
-  purse_left = spider_n;
+  purse_left = spider_n + (BOSS_KIND[idx] ? 1 : 0);
   {
-    static const float sfrac[5] = { 0.30f, 0.48f, 0.62f, 0.76f, 0.90f };
+    static const float sfrac[10] = {
+      0.22f, 0.34f, 0.46f, 0.56f, 0.66f, 0.74f, 0.80f, 0.84f, 0.88f, 0.92f
+    };
     for (i = 0; i < spider_n; i++) {
       float sx = stage_len * sfrac[i];
       if (ground_y(sx) > 300.0f) sx += 50.0f;
@@ -368,6 +388,29 @@ static void reset_stage(int idx) {
     }
   }
   for (i = 0; i < MAX_SHARDS; i++) shards[i].live = 0;
+
+  boss.kind = BOSS_KIND[idx];
+  boss.max_hp = boss.kind ? 9 : 0;
+  boss.hp = boss.max_hp;
+  boss.alive = boss.kind ? 1 : 0;
+  boss.active = 0;
+  boss.x = stage_len * 0.80f;
+  boss.home = boss.x;
+  boss.base_y = 0.0f;
+  boss.facing = -1;
+  boss.intro = 1.2f;
+  boss.cd = 1.5f;
+  boss.claw_t = 0.0f;
+  boss.pounce_t = 0.0f;
+  boss.pounce_x = boss.x;
+  boss.hop_t = 0.0f;
+  boss.hop_from = boss.x;
+  boss.hop_to = boss.x;
+  boss.lift = 0.0f;
+  boss.steam_t = 0.0f;
+  boss.steam_burst = 0.0f;
+  boss.hops = 0;
+  boss.flash = 0.0f;
 
   cam = 0;
   /* The peddler is set up where the road begins: the window opens first. */
@@ -408,16 +451,99 @@ static void hurt(int dmg) {
 }
 
 static void shoot(void) {
-  int i;
-  for (i = 0; i < MAX_SHARDS; i++) {
-    if (!shards[i].live) {
-      shards[i].x = p.x + p.facing * 7;
-      shards[i].y = p.y - 11;
-      shards[i].vx = p.facing * 250.0f;
-      shards[i].life = 1.6f;
-      shards[i].live = 1;
-      p.shoot_cd = 0.28f;
+  /* While a keeper stands her aim is already on it: the shards leave her in
+   * both directions, so whichever way she runs the boss is still in reach. */
+  int dirs = (boss.alive && boss.active) ? 2 : 1;
+  int d, i;
+  for (d = 0; d < dirs; d++) {
+    float dir = d == 0 ? (float)p.facing : -(float)p.facing;
+    for (i = 0; i < MAX_SHARDS; i++) {
+      if (!shards[i].live) {
+        shards[i].x = p.x + dir * 7.0f;
+        shards[i].y = p.y - 11.0f;
+        shards[i].vx = dir * 250.0f;
+        shards[i].life = 1.6f;
+        shards[i].live = 1;
+        break;
+      }
+    }
+  }
+  p.shoot_cd = 0.28f;
+}
+
+/* ---- the keepers' rules ------------------------------------------------ */
+static void update_boss(float dt) {
+  float ad;
+  if (!boss.alive) return;
+  if (!boss.active) {
+    if (p.x > boss.x - 150.0f) boss.active = 1;
+    else return;
+  }
+  if (boss.flash > 0.0f) boss.flash -= dt;
+  if (boss.steam_burst > 0.0f) boss.steam_burst -= dt;
+  if (boss.intro > 0.0f) { boss.intro -= dt; return; }
+  boss.base_y = ground_y(boss.x);
+  boss.facing = (p.x < boss.x) ? -1 : 1;
+  ad = fabsf(p.x - boss.x);
+
+  if (boss.kind == 1) {
+    /* the tiger: closes the gap on two legs, swipes, and leaps at her mark */
+    if (boss.claw_t > 0.0f) {
+      boss.claw_t -= dt;
+      if (boss.claw_t <= 0.0f && ad < 40.0f) hurt(1);
       return;
+    }
+    if (boss.pounce_t > 0.0f) {
+      boss.pounce_t -= dt;
+      boss.x += (boss.pounce_x - boss.x) * clampf(dt * 6.0f, 0.0f, 1.0f);
+      boss.lift = sinf((1.0f - boss.pounce_t / 0.5f) * 3.14159f) * 14.0f;
+      if (boss.pounce_t <= 0.0f) {
+        boss.lift = 0.0f;
+        if (fabsf(p.x - boss.x) < 24.0f) hurt(1);
+        boss.cd = 1.0f;
+      }
+      return;
+    }
+    boss.lift = 0.0f;
+    if (ad > 44.0f) boss.x += (p.x > boss.x ? 1.0f : -1.0f) * (ad > 120.0f ? 72.0f : 34.0f) * dt;
+    boss.cd -= dt;
+    if (boss.cd <= 0.0f) {
+      if (ad < 62.0f) boss.claw_t = 0.4f;
+      else { boss.pounce_t = 0.5f; boss.pounce_x = p.x; }
+      boss.cd = 1.5f;
+    }
+  } else {
+    /* the water dragon: hops the span, and every second landing breathes */
+    if (boss.steam_t > 0.0f) {
+      boss.steam_t -= dt;
+      if (boss.steam_t <= 0.0f) {
+        boss.steam_burst = 0.5f;
+        if (ad < 170.0f) hurt(1);
+      }
+      return;
+    }
+    if (boss.hop_t > 0.0f) {
+      float k;
+      boss.hop_t -= dt;
+      k = 1.0f - boss.hop_t / 0.9f;
+      boss.x = boss.hop_from + (boss.hop_to - boss.hop_from) * k;
+      boss.lift = sinf(k * 3.14159f) * 26.0f;
+      if (boss.hop_t <= 0.0f) {
+        boss.lift = 0.0f;
+        boss.hops++;
+        if (boss.hops % 2 == 0) boss.steam_t = 0.7f;
+        boss.cd = 0.8f;
+      }
+      return;
+    }
+    boss.lift = 0.0f;
+    boss.cd -= dt;
+    if (boss.cd <= 0.0f) {
+      boss.hop_from = boss.x;
+      boss.hop_to = (boss.x < boss.home) ? boss.home + 130.0f : boss.home - 130.0f;
+      boss.hop_to = clampf(boss.hop_to, 24.0f, stage_len - 24.0f);
+      boss.hop_t = 0.9f;
+      boss.cd = 0.8f;
     }
   }
 }
@@ -558,6 +684,28 @@ static void update_play(float dt, GameInput in, int jump_pressed, int action_pre
     }
   }
 
+  update_boss(dt);
+  if (boss.alive && boss.active) {
+    /* The keeper holds the end of the road: she cannot walk past it. */
+    if (p.x > boss.home + 70.0f) p.x = boss.home + 70.0f;
+    {
+      float bhit_y = ground_y(boss.x) - 20.0f - boss.lift;
+      for (i = 0; i < MAX_SHARDS; i++) {
+        if (!shards[i].live) continue;
+        if (fabsf(shards[i].x - boss.x) < 24.0f && fabsf(shards[i].y - bhit_y) < 30.0f) {
+          shards[i].live = 0;
+          boss.hp--;
+          boss.flash = 0.12f;
+          if (boss.hp <= 0) {
+            boss.hp = 0;
+            boss.alive = 0;
+            souls += roll_souls();
+          }
+        }
+      }
+    }
+  }
+
   for (i = 0; i < mem_n; i++) {
     if (mems[i].taken) continue;
     if (fabsf(p.x - mems[i].x) < 9.0f
@@ -569,7 +717,7 @@ static void update_play(float dt, GameInput in, int jump_pressed, int action_pre
 
   cam = clampf(p.x - 110.0f, 0.0f, stage_len - W);
 
-  if (p.x > stage_len - 34.0f && mem_taken >= mem_n) {
+  if (p.x > stage_len - 34.0f && mem_taken >= mem_n && !boss.alive) {
     state = 1;
     state_t = 2.0f;
   }
@@ -635,6 +783,8 @@ static void draw_world(void) {
     px(sx + 6, sy - 5, to565(0x140E16));
   }
 
+  draw_boss();
+
   for (i = 0; i < MAX_SHARDS; i++) {
     int sx, sy;
     if (!shards[i].live) continue;
@@ -679,6 +829,49 @@ static void draw_world(void) {
   }
 }
 
+static void draw_boss(void) {
+  int bx, by, i;
+  if (!boss.alive) return;
+  bx = (int)(boss.x - cam);
+  if (bx < -60 || bx > W + 60) return;
+  by = (int)(ground_y(boss.x) - boss.lift);
+  if (boss.kind == 1) {
+    rect(bx - 9, by - 30, 18, 22, to565(0xB4651C));
+    rect(bx - 7, by - 34, 14, 8, to565(0xD08634));
+    rect(bx - 5, by - 30, 10, 13, to565(0xE8CFA4));
+    rect(bx - 3, by - 44, 12, 11, to565(0xD08634));
+    px(bx - 2, by - 42, to565(0xFFD47A));
+    px(bx + 4, by - 42, to565(0xFFD47A));
+    px(bx - 1, by - 40, to565(0x1A0F08));
+    px(bx + 3, by - 40, to565(0x1A0F08));
+    rect(bx + 5, by - 39, 5, 3, to565(0xF0DCB4));
+    for (i = 0; i < 3; i++) rect(bx - 9 + i * 5, by - 28, 2, 5, to565(0x3A2210));
+    rect(bx - 11, by - 26, 3, 10, to565(0xA85A18));
+    rect(bx + 8, by - 26, 3, 10, to565(0xA85A18));
+    rect(bx - 6, by - 10, 4, 10, to565(0x3A2414));
+    rect(bx + 2, by - 10, 4, 10, to565(0x3A2414));
+    if (boss.claw_t > 0.0f) rect(bx - 20, by - 30, 9, 4, to565(0xD89A4C));
+  } else {
+    rect(bx - 16, by - 22, 30, 12, to565(0x1D5A60));
+    rect(bx - 14, by - 25, 24, 6, to565(0x8FC9BF));
+    rect(bx - 24, by - 30, 8, 5, to565(0x123A40));
+    rect(bx + 8, by - 31, 13, 9, to565(0x24707A));
+    rect(bx + 13, by - 27, 9, 4, to565(0x7A2A2E));
+    for (i = 0; i < 4; i++) px(bx + 15 + i * 2, by - 26, to565(0xD96A72));
+    px(bx + 11, by - 32, to565(0xDFF7F2));
+    for (i = 0; i < 3; i++) px(bx + 9 + i * 3, by - 35, to565(0xCFEAE4));
+    rect(bx - 8, by - 10, 3, 10, to565(0x16424A));
+    rect(bx + 4, by - 10, 3, 10, to565(0x16424A));
+    if (boss.steam_t > 0.0f) disc(bx + 23, by - 24, 3, to565(0xDFF8F4));
+    if (boss.steam_burst > 0.0f) {
+      for (i = 0; i < 3; i++) {
+        rect(bx - 60 - i * 14, by - 36 - i * 5, 120 + i * 24, 34 + i * 8, to565(0xCFEAE4));
+      }
+    }
+  }
+  if (boss.flash > 0.0f) rect(bx - 18, by - 46, 36, 46, to565(0xFFFFFF));
+}
+
 static void draw_hud(void) {
   char buf[16];
   int i;
@@ -701,6 +894,13 @@ static void draw_hud(void) {
     rect(7, 13, fill, 1, bc);
   }
 
+  if (boss.alive && boss.active) {
+    int bw = W - 120;
+    rect(60, 20, bw, 4, to565(0x30202A));
+    rect(60, 20, bw * boss.hp / boss.max_hp, 4, to565(0xE05050));
+    px(60, 20, to565(0xFFD9A0));
+  }
+
   mem_str(buf, souls);
   text(buf, W - 6 - text_w(buf, 1), 5, 1, to565(0xFFD9A0));
   buf[0] = 'M'; buf[1] = 'E'; buf[2] = 'M'; buf[3] = ' ';
@@ -714,7 +914,8 @@ static void draw_hud(void) {
     text_center(STAGES[stage_i].name, 56, 1, to565(0xF0ECDC));
     text_center("COLLECT THE MEMORIES", 66, 1, to565(0x9FB4C4));
     if (stage_i == 0 && banner > 1.2f) {
-      text_center("LEFT RIGHT MOVE   X JUMP   C SHARD", H - 14, 1, to565(0xB8C4D0));
+      text_center("LEFT RIGHT MOVE   X JUMP   C SHARD", H - 22, 1, to565(0xB8C4D0));
+      text_center("HOLD C TO RUN - IT SPENDS HER BREATH", H - 12, 1, to565(0x8D869F));
     }
   }
 
@@ -872,6 +1073,8 @@ int game_souls(void) { return souls; }
 int game_stamina(void) { return (int)p.stamina; }
 int game_max_hp(void) { return max_hp; }
 int game_auto_kill(void) { return auto_kill; }
+int game_boss_kind(void) { return boss.kind; }
+int game_boss_hp(void) { return boss.hp; }
 int game_bots_killed(void) { return bots_killed; }
 
 #ifdef GAME_TEST
