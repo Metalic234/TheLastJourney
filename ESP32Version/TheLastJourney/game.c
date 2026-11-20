@@ -75,6 +75,8 @@ typedef struct {
   float x, y, vx, vy;
   int on_ground, facing, hp, invuln;
   float shoot_cd, anim;
+  float stamina;   /* her breath: running spends it */
+  int winded;
 } Player;
 
 typedef struct {
@@ -106,30 +108,39 @@ static float state_t;
 static float banner;
 static int finished;
 
-/* ---- the memory peddler ------------------------------------------------ */
-/* Memories are the purse: they add up across the run and the stall spends
- * them. The three wares are small, permanent and paid for once. */
-#define SHOP_ROWS 5
-static int purse;
+/* ---- the soul peddler -------------------------------------------------- */
+/* Souls are the purse: they come off the bots she puts down, they add up
+ * across the run, and the stall at the first of every road spends them. */
+#define SHOP_ROWS 3
+static int souls;
 static int max_hp = 3;
 static int shop_sel;
-static int boots;
-static int long_shards;
 static int auto_kill;
 static int bots_killed;
 static float shop_t;
 static float zap_t, zap_x, zap_cd;
 
-static const char *SHOP_NAME[4] = { "EXTRA HEART", "SWIFT BOOTS", "LONG SHARDS", "AUTOMATIC BOT KILLER" };
-static const int SHOP_COST[4] = { 2, 1, 1, 2 };
-static const char *SHOP_DESC[4] = {
-  "ONE MORE BEAT IN HER CHEST. SHE IS MENDED.",
-  "SHE RUNS A LITTLE FASTER ON EVERY ROAD.",
-  "HER SHARDS CARRY FURTHER BEFORE THEY FALL.",
+static const char *SHOP_NAME[2] = { "AUTOMATIC GUARDIAN", "REFILL HER HEALTH" };
+static const int SHOP_COST[2] = { 150, 10 };
+static const char *SHOP_DESC[2] = {
   "TWO SHADOWS KILL NEARBY BOTS. NEVER A BOSS.",
+  "HER LIFE FILLS TO THE BRIM AGAIN.",
 };
 
+/* Souls come in tens, and a hundred is almost never seen. */
+static int roll_souls(void) {
+  int r = rand() % 1000;
+  if (r < 850) return 10;
+  if (r < 930) return 15;
+  if (r < 970) return 20;
+  if (r < 990) return 30;
+  if (r < 998) return 50;
+  return 100;
+}
+
 /* ---- helpers ----------------------------------------------------------- */
+static void mem_str(char *b, int n);
+
 static float clampf(float v, float a, float b) {
   return v < a ? a : (v > b ? b : v);
 }
@@ -300,10 +311,11 @@ static void reset_stage(int idx) {
   p.vy = 0;
   p.on_ground = 1;
   p.facing = 1;
-  p.hp = max_hp;
   p.invuln = 0;
   p.shoot_cd = 0;
   p.anim = 0;
+  p.stamina = 100.0f;
+  p.winded = 0;
   zap_t = 0.0f;
   zap_cd = 0.0f;
 
@@ -336,22 +348,24 @@ static void reset_stage(int idx) {
   for (i = 0; i < MAX_SHARDS; i++) shards[i].live = 0;
 
   cam = 0;
-  state = 0;
+  /* The peddler is set up where the road begins: the window opens first. */
+  state = 4;
   state_t = 0;
+  shop_sel = 0;
+  shop_t = 0.0f;
   banner = 2.6f;
 }
 
 void game_init(void) {
   finished = 0;
-  purse = 0;
+  souls = 0;
   max_hp = 3;
-  boots = 0;
-  long_shards = 0;
   auto_kill = 0;
   bots_killed = 0;
   shop_sel = 0;
   memset(fb, 0, sizeof(fb));
   reset_stage(0);
+  p.hp = max_hp;
 }
 
 /* ---- rules ------------------------------------------------------------- */
@@ -378,7 +392,7 @@ static void shoot(void) {
       shards[i].x = p.x + p.facing * 7;
       shards[i].y = p.y - 11;
       shards[i].vx = p.facing * 250.0f;
-      shards[i].life = long_shards ? 2.2f : 1.3f;
+      shards[i].life = 1.6f;
       shards[i].live = 1;
       p.shoot_cd = 0.28f;
       return;
@@ -389,12 +403,10 @@ static void shoot(void) {
 static void reset_stage(int idx);
 
 static void leave_shop(void) {
-  if (stage_i < 2) {
-    reset_stage(stage_i + 1);
-  } else {
-    state = 3;
-    finished = 1;
-  }
+  /* The stall is the first thing on every road: leaving it is stepping on. */
+  state = 0;
+  state_t = 0;
+  banner = 1.4f;
 }
 
 static void update_shop(int left_pressed, int right_pressed, int jump_pressed, int action_pressed) {
@@ -403,28 +415,17 @@ static void update_shop(int left_pressed, int right_pressed, int jump_pressed, i
   if (jump_pressed) { leave_shop(); return; }
   if (!action_pressed) return;
 
-  if (shop_sel >= 4) { leave_shop(); return; }
+  if (shop_sel >= 2) { leave_shop(); return; }
   if (shop_sel == 0) {
-    if (max_hp < 5 && purse >= SHOP_COST[0]) {
-      purse -= SHOP_COST[0];
-      max_hp++;
-      p.hp = max_hp;
-    }
-  } else if (shop_sel == 1) {
-    if (!boots && purse >= SHOP_COST[1]) {
-      purse -= SHOP_COST[1];
-      boots = 1;
-    }
-  } else if (shop_sel == 2) {
-    if (!long_shards && purse >= SHOP_COST[2]) {
-      purse -= SHOP_COST[2];
-      long_shards = 1;
-    }
-  } else if (shop_sel == 3) {
-    if (!auto_kill && purse >= SHOP_COST[3]) {
-      purse -= SHOP_COST[3];
+    if (!auto_kill && souls >= SHOP_COST[0]) {
+      souls -= SHOP_COST[0];
       auto_kill = 1;
       bots_killed = 0;
+    }
+  } else if (shop_sel == 1) {
+    if (p.hp < max_hp && souls >= SHOP_COST[1]) {
+      souls -= SHOP_COST[1];
+      p.hp = max_hp;
     }
   }
 }
@@ -433,9 +434,22 @@ static void update_play(float dt, GameInput in, int jump_pressed, int action_pre
   int dir = (in.right ? 1 : 0) - (in.left ? 1 : 0);
   float gy;
   int i;
+  /* Holding the shard button while she moves makes her run. The sprint
+   * spends her breath; a shard does not. */
+  int running = 0;
 
   if (dir != 0) p.facing = dir;
-  p.vx += (dir * (boots ? 88.0f : 74.0f) - p.vx) * clampf(dt * 9.0f, 0.0f, 1.0f);
+
+  running = in.action && dir != 0 && p.on_ground && p.stamina > 0.0f && !p.winded;
+  if (running) {
+    p.stamina -= 34.0f * dt;
+    if (p.stamina <= 0.0f) { p.stamina = 0.0f; p.winded = 1; }
+  } else {
+    p.stamina += 22.0f * dt;
+    if (p.stamina > 100.0f) p.stamina = 100.0f;
+    if (p.winded && p.stamina >= 35.0f) p.winded = 0;
+  }
+  p.vx += (dir * (running ? 118.0f : 74.0f) - p.vx) * clampf(dt * 9.0f, 0.0f, 1.0f);
   if (jump_pressed && p.on_ground) {
     p.vy = -184.0f;
     p.on_ground = 0;
@@ -489,6 +503,7 @@ static void update_play(float dt, GameInput in, int jump_pressed, int action_pre
       zap_cd = 0.55f;
       spiders[best].alive = 0;
       bots_killed++;
+      souls += roll_souls();
     }
   }
 
@@ -514,6 +529,7 @@ static void update_play(float dt, GameInput in, int jump_pressed, int action_pre
             && shards[k].y < ground_y(sp->x) + 2.0f) {
           sp->alive = 0;
           shards[k].live = 0;
+          souls += roll_souls();
           break;
         }
       }
@@ -526,7 +542,6 @@ static void update_play(float dt, GameInput in, int jump_pressed, int action_pre
         && p.y > mems[i].y - 2 && p.y < mems[i].y + 18) {
       mems[i].taken = 1;
       mem_taken++;
-      purse++;
     }
   }
 
@@ -656,12 +671,22 @@ static void draw_hud(void) {
     px(hx + 1, 8, c);
   }
 
+  /* her breath, under the hearts */
+  rect(6, 12, 44, 3, to565(0x101018));
+  {
+    int fill = (int)(p.stamina * 0.44f);
+    uint16_t bc = p.winded ? to565(0x6B6478) : (p.stamina > 30.0f ? to565(0x8FD0FF) : to565(0xFFB066));
+    rect(7, 13, fill, 1, bc);
+  }
+
+  mem_str(buf, souls);
+  text(buf, W - 6 - text_w(buf, 1), 5, 1, to565(0xFFD9A0));
   buf[0] = 'M'; buf[1] = 'E'; buf[2] = 'M'; buf[3] = ' ';
   buf[4] = (char)('0' + mem_taken);
   buf[5] = '/';
   buf[6] = (char)('0' + mem_n);
   buf[7] = 0;
-  text(buf, W - 6 - text_w(buf, 1), 5, 1, to565(0xE8E4D8));
+  text(buf, W - 6 - text_w(buf, 1), 13, 1, to565(0x9FB4C4));
 
   if (banner > 0.0f) {
     text_center(STAGES[stage_i].name, 56, 1, to565(0xF0ECDC));
@@ -687,7 +712,7 @@ static void draw_hud(void) {
 /* ---- the peddler's window ---------------------------------------------- */
 static void mem_str(char *b, int n) {
   int i = 0;
-  b[i++] = 'M'; b[i++] = 'E'; b[i++] = 'M'; b[i++] = ' ';
+  b[i++] = 'S'; b[i++] = 'O'; b[i++] = 'U'; b[i++] = 'L'; b[i++] = ' ';
   if (n >= 100) b[i++] = (char)('0' + (n / 100) % 10);
   if (n >= 10) b[i++] = (char)('0' + (n / 10) % 10);
   b[i++] = (char)('0' + (n % 10));
@@ -696,9 +721,11 @@ static void mem_str(char *b, int n) {
 
 static void cost_str(char *b, int cost) {
   int i = 0;
+  if (cost >= 100) b[i++] = (char)('0' + (cost / 100) % 10);
+  if (cost >= 10) b[i++] = (char)('0' + (cost / 10) % 10);
   b[i++] = (char)('0' + (cost % 10));
   b[i++] = ' ';
-  b[i++] = 'M'; b[i++] = 'E'; b[i++] = 'M';
+  b[i++] = 'S'; b[i++] = 'O'; b[i++] = 'U'; b[i++] = 'L';
   b[i] = 0;
 }
 
@@ -723,14 +750,14 @@ static void draw_shop(void) {
   rect(38, 22, 1, H - 44, to565(0x8E7FB0));
   rect(W - 39, 22, 1, H - 44, to565(0x8E7FB0));
 
-  text_center("THE MEMORY PEDDLER", 30, 1, to565(0xF0E8F8));
-  mem_str(buf, purse);
+  text_center("THE SOUL PEDDLER", 30, 1, to565(0xF0E8F8));
+  mem_str(buf, souls);
   text(buf, W - 44 - text_w(buf, 1), 40, 1, to565(0xD8C9A8));
 
   for (i = 0; i < SHOP_ROWS; i++) {
     int owned = 0;
     const char *label;
-    y = 56 + i * 16;
+    y = 56 + i * 18;
     if (i == shop_sel) {
       rect(46, y - 3, W - 92, 13, to565(0x2A2140));
       px(48, y + 1, to565(0xFFD9A0));
@@ -738,30 +765,33 @@ static void draw_shop(void) {
       px(49, y + 2, to565(0xFFD9A0));
       px(48, y + 3, to565(0xFFD9A0));
     }
-    if (i == 4) {
-      text("LEAVE THE STALL", 56, y, 1, shop_sel == 4 ? to565(0xFFFFFF) : to565(0xB9B2C8));
+    if (i == 2) {
+      text("LEAVE THE STALL", 56, y, 1, shop_sel == 2 ? to565(0xFFFFFF) : to565(0xB9B2C8));
       text("WALK ON", W - 84, y, 1, to565(0x8A8296));
       continue;
     }
     label = SHOP_NAME[i];
-    if (i == 0) owned = max_hp >= 5;
-    else if (i == 1) owned = boots;
-    else if (i == 2) owned = long_shards;
-    else owned = auto_kill;
+    if (i == 0) owned = auto_kill;
+    else owned = (p.hp >= max_hp) ? 2 : 0;
 
-    if (owned) {
+    if (owned == 1) {
       text(label, 56, y, 1, to565(0x6B6478));
       text("OWNED", W - 84, y, 1, to565(0x6B6478));
       continue;
     }
-    text(label, 56, y, 1, purse >= SHOP_COST[i] ? to565(0xF6E2C0) : to565(0x8A8296));
+    if (owned == 2) {
+      text(label, 56, y, 1, to565(0x6B6478));
+      text("WHOLE", W - 84, y, 1, to565(0x6B6478));
+      continue;
+    }
+    text(label, 56, y, 1, souls >= SHOP_COST[i] ? to565(0xF6E2C0) : to565(0x8A8296));
     cost_str(buf, SHOP_COST[i]);
     text(buf, W - 44 - text_w(buf, 1), y, 1,
-         purse >= SHOP_COST[i] ? to565(0xFFD9A0) : to565(0x8A8296));
+         souls >= SHOP_COST[i] ? to565(0xFFD9A0) : to565(0x8A8296));
   }
 
-  if (shop_sel < 4) text_center(SHOP_DESC[shop_sel], 128, 1, to565(0xC9C1D6));
-  else text_center("SHE TAKES HER MEMORIES WITH HER.", 128, 1, to565(0xC9C1D6));
+  if (shop_sel < 2) text_center(SHOP_DESC[shop_sel], 118, 1, to565(0xC9C1D6));
+  else text_center("SHE TAKES HER SOULS WITH HER.", 118, 1, to565(0xC9C1D6));
 
   if (shop_t > 0.25f) {
     text_center("LEFT RIGHT CHOOSE   C BUY   X GO", H - 34, 1, to565(0x8D869F));
@@ -784,9 +814,8 @@ void game_update(float dt, GameInput in) {
   if (state == 1) {
     state_t -= dt;
     if (state_t <= 0) {
-      /* A road that ends in a boss ends at the peddler: the shop opens
-       * before the next road instead of cutting straight to it. */
-      if (stage_i < 2) { state = 4; shop_sel = 0; shop_t = 0.0f; }
+      /* The next road begins at the peddler's stall. */
+      if (stage_i < 2) reset_stage(stage_i + 1);
       else { state = 3; finished = 1; }
     }
   } else if (state == 4) {
@@ -794,7 +823,10 @@ void game_update(float dt, GameInput in) {
     update_shop(left_pressed, right_pressed, jump_pressed, action_pressed);
   } else if (state == 2) {
     state_t -= dt;
-    if (state_t <= 0) reset_stage(stage_i);
+    if (state_t <= 0) {
+      p.hp = max_hp;   /* a retry is a fresh start, not a slow death */
+      reset_stage(stage_i);
+    }
   } else if (state == 3) {
     if (action_pressed) { finished = 0; reset_stage(0); }
   } else {
@@ -813,10 +845,16 @@ int game_memories(void) { return mem_taken; }
 int game_total_memories(void) { return mem_n; }
 int game_finished(void) { return finished; }
 int game_state(void) { return state; }
-int game_purse(void) { return purse; }
+int game_purse(void) { return souls; }
+int game_souls(void) { return souls; }
+int game_stamina(void) { return (int)p.stamina; }
 int game_max_hp(void) { return max_hp; }
 int game_auto_kill(void) { return auto_kill; }
 int game_bots_killed(void) { return bots_killed; }
+
+#ifdef GAME_TEST
+void game_test_souls(int n) { souls += n; }
+#endif
 
 /* Extras for host tools and tests. */
 float game_ground_at(float x) { return ground_y(x); }

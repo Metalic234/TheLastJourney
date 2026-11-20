@@ -1,5 +1,25 @@
-THE LAST JOURNEY — Android Edition (v1.9)
+THE LAST JOURNEY — Android Edition (v2.0)
 ==========================================
+
+WHAT'S NEW IN v2.0
+------------------
+- MEMORIES ARE SOULS NOW. Every bot she puts down and every memory she
+  picks up pays out souls: ten at the least, a hundred almost never.
+- SHE HAS STAMINA AND SHE CAN RUN. Hold Shift (or the dash button on a
+  phone) while walking and she sprints at nearly twice her walk until her
+  breath runs out; it comes back while she walks. The dash itself costs
+  no stamina. Her breath is the thin blue bar under the souls counter.
+- THE SHOP IS ON EVERY ROAD, at the very start. The peddler's stall waits
+  a few steps from where she wakes, in all eight stages, not only after a
+  boss.
+- HER HEALTH IS NOT MENDED BY THE NEXT STAGE. Wounds carry from road to
+  road; only the peddler's refill fills the bar again. A retry after death
+  starts that stage with a whole bar.
+- THE WARES ARE TWO: AUTOMATIC GUARDIAN, 150 souls, once taken only —
+  the two shadows kill nearby dogs, spiders and crabs by themselves and
+  never a boss; REFILL HER HEALTH, 10 souls, buy it as often as she needs.
+- Same release key as v1.9, so it installs straight over it: versionName
+  2.0, versionCode 11.
 
 WHAT'S NEW IN v1.9
 ------------------
@@ -17,8 +37,8 @@ WHAT'S NEW IN v1.9
 
 WHAT'S NEW IN v1.8
 ------------------
-- THE MEMORY PEDDLER: a road that ends in a boss now ends at a stall
-  instead of cutting straight to the next road. Walk up to it and the
+- THE (SINCE RENAMED) SOUL PEDDLER: a road that ends in a boss ended at a
+  stall instead of cutting straight to the next road. Walk up to it and the
   window opens. Memories are the currency, so the choice is real: buy
   power now, or keep the memory for later.
   Wares: A SPARE HEART (2 memories), SHARD EDGE (1), KNIGHTS' FOCUS (2),

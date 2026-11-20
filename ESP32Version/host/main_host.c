@@ -1,6 +1,6 @@
 /* Host harness: run the pocket edition without a display and dump frames.
- *   cc -O2 -std=c99 -o tlj_pocket host/main_host.c TheLastJourney/game.c -lm
- *   ./tlj_pocket out/
+ *   ./build-host.sh            (adds -DGAME_TEST, which exposes game_test_souls)
+ *   cc -O2 -std=c99 -DGAME_TEST -o tlj_pocket host/main_host.c TheLastJourney/game.c -lm
  * The dumps are PPM (P6) so they can be inspected or converted to PNG.
  */
 #include <stdio.h>
@@ -38,29 +38,55 @@ int main(int argc, char **argv) {
   const char *dir = argc > 1 ? argv[1] : ".";
   const float dt = 1.0f / 30.0f;
   int f;
+  int shop_frames = 0;
+  int shop_visits = 0;
+  int in_shop = 0; /* the run starts at the stall */
+  int hp_at_stage[3] = { 0, 0, 0 };
 
   game_init();
-  int shop_frames = 0;
-  int shop_shots = 0;
-  for (f = 0; f < 6000; f++) {
+
+  for (f = 0; f < 12000; f++) {
     GameInput in;
     memset(&in, 0, sizeof(in));
 
     if (game_state() == 4) {
-      /* the peddler: walk the rows to the bot killer, buy it, then take the road */
-      shop_frames++;
-      if (shop_frames == 2) { write_ppm(dir, f); printf("shop window at frame %d (purse %d)\n", f, game_purse()); }
-      in.left = (shop_frames == 1 || shop_frames == 3);
-      in.action = shop_frames == 5;
-      if (shop_frames > 40 && (shop_frames % 2) == 0) in.jump = 1;
-      game_update(dt, in);
-      if (shop_frames == 7) {
-        printf("bot killer owned at frame %d (purse %d)\n", f, game_purse());
+      if (!in_shop) {
+        in_shop = 1;
+        shop_frames = 0;
+        shop_visits++;
       }
+      shop_frames++;
+
+      if (shop_visits == 1) {
+        /* stage I: look at the window, then step onto the road */
+        if (shop_frames == 2) {
+          write_ppm(dir, f);
+          printf("shop at stage %d frame %d souls %d hp %d/%d\n",
+                 game_stage(), f, game_souls(), game_hp(), game_max_hp());
+        }
+        if (shop_frames == 3 || shop_frames == 5) in.right = 1;
+        if (shop_frames == 7) in.action = 1;
+      } else if (shop_visits == 2) {
+        /* stage II: buy the guardian, never the boss-killer */
+        if (shop_frames == 1) game_test_souls(200);
+        if (shop_frames == 2) in.action = 1;
+        if (shop_frames == 3) {
+          printf("guardian owned %d souls %d\n", game_auto_kill(), game_souls());
+          hp_at_stage[1] = game_hp();
+        }
+        if (shop_frames == 4 || shop_frames == 6) in.right = 1;
+        if (shop_frames == 8) in.action = 1;
+      } else {
+        /* later roads: look, then go */
+        if (shop_frames == 2) hp_at_stage[2] = game_hp();
+        if (shop_frames == 3 || shop_frames == 5) in.right = 1;
+        if (shop_frames == 7) in.action = 1;
+      }
+      game_update(dt, in);
       continue;
     }
-    if (shop_frames) { shop_shots++; shop_frames = 0; }
 
+    in_shop = 0;
     in.right = 1;
     /* jump when a pit is just ahead, otherwise hop now and then */
     if (game_ground_at(game_player_x() + 20.0f) > 300.0f && (f % 2) == 0) in.jump = 1;
@@ -74,9 +100,10 @@ int main(int argc, char **argv) {
       break;
     }
   }
-  printf("stage=%d hp=%d/%d purse=%d memories=%d/%d shops=%d finished=%d\n",
-         game_stage(), game_hp(), game_max_hp(), game_purse(), game_memories(),
-         game_total_memories(), shop_shots, game_finished());
+  printf("stage=%d hp=%d/%d souls=%d memories=%d/%d shops=%d stamina=%d finished=%d\n",
+         game_stage(), game_hp(), game_max_hp(), game_souls(), game_memories(),
+         game_total_memories(), shop_visits, game_stamina(), game_finished());
+  printf("hp at stage II %d, at stage III %d\n", hp_at_stage[1], hp_at_stage[2]);
   printf("auto_kill=%d bots_killed=%d\n", game_auto_kill(), game_bots_killed());
   return 0;
 }

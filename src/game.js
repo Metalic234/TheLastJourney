@@ -104,7 +104,13 @@ export class Game {
     this.bossBattle = null;
     this.ending = null;
     this.powers = new Set();
-    this.memory = 0;
+    this.souls = 0;
+    this.stamina = 100;
+    this.staminaMax = 100;
+    this.winded = false;
+    this.lifeHP = null;
+    this.lifeMax = 100;
+    this.soulPops = [];
     this.bought = new Map();
     this.shop = null;
     this.shopNear = false;
@@ -185,6 +191,8 @@ export class Game {
     this.nearby = null;
     this.shop = null;
     this.shopNear = false;
+    this.stamina = this.staminaMax;
+    this.winded = false;
     this.finale = null;
     this.bossBattle = null;
     this.dashT = 0;
@@ -202,6 +210,8 @@ export class Game {
     this.audio.applyBiome(this.moodBiome());
     this.showCard(this.level);
     if (this.level.hostile) this.initWilds();
+    // The soul peddler is already set up where every road begins.
+    this.openStall(this.level.spawnX + 66);
   }
 
   showCard(level) {
@@ -211,7 +221,11 @@ export class Game {
   async startGame() {
     this.found.clear();
     this.powers.clear();
-    this.memory = 0;
+    this.souls = 0;
+    this.stamina = this.staminaMax;
+    this.winded = false;
+    this.lifeHP = null;
+    this.soulPops = [];
     this.bought.clear();
     this.shop = null;
     this.shopNear = false;
@@ -249,6 +263,9 @@ export class Game {
     this.fade = 1;
     this.fadeTarget = 0;
     this.frozen = false;
+    this.lifeHP = null;
+    this.stamina = this.staminaMax;
+    this.winded = false;
     this.loadLevel(index);
     this.audio.applyBiome(this.moodBiome());
     this.audio.play('transition');
@@ -288,6 +305,8 @@ export class Game {
       this.memorySurge.t += dt;
       if (this.memorySurge.t > 1.6) this.memorySurge = null;
     }
+    for (const pop of this.soulPops) pop.t += dt;
+    this.soulPops = this.soulPops.filter((pop) => pop.t < 1.1);
     this.audio.update();
     this.fade = this.approach(this.fade, this.fadeTarget, dt * 1.7);
     if (this.mutedNotice > 0) this.mutedNotice -= dt;
@@ -433,6 +452,10 @@ export class Game {
     const canControl = !this.frozen && !this.finale;
 
     this.dashCd = Math.max(0, this.dashCd - dt);
+    // Running is hers from the first step: hold Shift and she sprints until
+    // her breath runs out. The dash spends none of it.
+    const wantsRun = canControl && this.input.down('dash') && p.onGround && !this.winded;
+    let running = false;
 
     if (canControl) {
       move = (this.input.down('right') ? 1 : 0) - (this.input.down('left') ? 1 : 0);
@@ -488,11 +511,21 @@ export class Game {
       }
     }
 
+    running = wantsRun && move !== 0 && this.stamina > 0;
+    if (running) {
+      this.stamina = Math.max(0, this.stamina - dt * 30);
+      if (this.stamina <= 0) this.winded = true;
+    } else {
+      this.stamina = Math.min(this.staminaMax, this.stamina + dt * 20);
+      if (this.winded && this.stamina >= 35) this.winded = false;
+    }
+
     if (this.dashT > 0) {
       this.dashT -= dt;
       p.vx = p.facing * DASH_SPEED;
     } else {
-      p.vx = damp(p.vx, move * SPEED * (1 + 0.14 * this.upgradeCount('boots')), 13, dt);
+      const gait = running ? SPEED * 1.62 : SPEED;
+      p.vx = damp(p.vx, move * gait * (1 + 0.14 * this.upgradeCount('boots')), 13, dt);
     }
 
     const nx = p.x + p.vx * dt;
@@ -700,7 +733,7 @@ export class Game {
 
   collect(m) {
     this.found.add(m.id);
-    this.memory += 1;
+    this.addSouls(this.rollSouls(), m.x, m.y - 6);
     // a memory is not a pickup: for a moment the whole world leans in
     this.memorySurge = { t: 0, color: m.color };
     this.audio.play('memory');
@@ -722,6 +755,23 @@ export class Game {
         drag: 0.97,
       });
     }
+  }
+
+  // Souls are what the road pays her: ten at the least, a hundred almost never.
+  rollSouls() {
+    const r = Math.random();
+    if (r < 0.60) return 10;
+    if (r < 0.80) return 15;
+    if (r < 0.92) return 20;
+    if (r < 0.97) return 30;
+    if (r < 0.995) return 50;
+    return 100;
+  }
+
+  addSouls(amount, x, y) {
+    if (!amount) return;
+    this.souls += amount;
+    this.soulPops.push({ amount, x, y, t: 0 });
   }
 
   // ---------------------------------------------------------------- shop
@@ -760,6 +810,21 @@ export class Game {
     return this.bought.get(id) || 0;
   }
 
+  // The duel uses the same life she carries between roads.
+  heroVitals() {
+    const max = 100 + 25 * this.upgradeCount('heart');
+    this.lifeMax = max;
+    const hp = this.lifeHP == null ? max : clamp(this.lifeHP, 0, max);
+    return { hp, max, hurt: 0 };
+  }
+
+  // Is there anything left to mend?
+  lifeIsFull() {
+    if (this.combat) return this.combat.hp >= this.combat.max;
+    if (this.bossBattle) return this.bossBattle.hero.hp >= this.bossBattle.hero.max;
+    return this.lifeHP == null || this.lifeHP >= this.lifeMax;
+  }
+
   updateShop(dt) {
     const s = this.shop;
     if (!s) return;
@@ -795,12 +860,17 @@ export class Game {
       this.audio.play('whisper');
       return;
     }
-    if (this.memory < item.cost) {
-      s.notice = { text: 'SHE HAS NO MEMORY LEFT TO GIVE.', t: 1.8, color: '#8a8296' };
+    if (item.id === 'heal' && this.lifeIsFull()) {
+      s.notice = { text: 'HER BREATH IS ALREADY WHOLE.', t: 1.8, color: '#8a8296' };
       this.audio.play('whisper');
       return;
     }
-    this.memory -= item.cost;
+    if (this.souls < item.cost) {
+      s.notice = { text: 'SHE HAS NO SOULS LEFT TO GIVE.', t: 1.8, color: '#8a8296' };
+      this.audio.play('whisper');
+      return;
+    }
+    this.souls -= item.cost;
     this.bought.set(item.id, owned + 1);
     this.applyUpgrade(item.id);
     this.audio.play('memory');
@@ -825,16 +895,11 @@ export class Game {
   }
 
   applyUpgrade(id) {
-    if (id !== 'heart') return;
-    // A bought heart is a real bar of life, in whichever fight is running.
-    if (this.combat) {
-      this.combat.max += 25;
-      this.combat.hp = this.combat.max;
-    }
-    if (this.bossBattle) {
-      this.bossBattle.hero.max += 25;
-      this.bossBattle.hero.hp = this.bossBattle.hero.max;
-    }
+    if (id !== 'heal') return;
+    // The peddler's cheapest ware: her breath, all of it, back in her chest.
+    if (this.combat) this.combat.hp = this.combat.max;
+    if (this.bossBattle) this.bossBattle.hero.hp = this.bossBattle.hero.max;
+    this.lifeHP = this.lifeMax;
   }
 
   drawStall(g) {
@@ -877,7 +942,7 @@ export class Game {
 
     if (!s.open && this.shopNear) {
       const pulse = 0.65 + Math.sin(this.time * 4) * 0.35;
-      const label = 'E  MEMORY PEDDLER';
+      const label = 'E  SOUL PEDDLER';
       const halfW = textWidth(label, 1, 1) / 2;
       const lx = clamp(sx, halfW + 6, W - halfW - 6);
       drawText(g, label, lx, baseY - 50, {
@@ -1113,7 +1178,7 @@ export class Game {
         slamPending: false,
         stompT: 0,
       })),
-      hero: { hp: 100 + 25 * this.upgradeCount('heart'), max: 100 + 25 * this.upgradeCount('heart'), hurt: 0 },
+      hero: this.heroVitals(),
       heroDown: false,
       shards: [],
       blueShards: [],
@@ -1135,6 +1200,7 @@ export class Game {
     const battle = this.bossBattle;
     if (!battle || battle.ending) return;
     battle.t += dt;
+    this.lifeHP = battle.hero.hp;
     battle.escapeBannerT = Math.max(0, battle.escapeBannerT - dt);
 
     // He is already finished. This is the two of them seeing it through.
@@ -1725,22 +1791,16 @@ export class Game {
     this.storyMetal = true;
     this.audio.setBeam(false);
     this.audio.applyBiome('metal');
-    // Both of them are down. What they leave her costs no memory at all.
+    // Both of them are down. What they leave her costs no souls at all.
     this.grantPowers(
       ['leap', 'dash'],
       'TWO POWERS, FREELY GIVEN',
-      'Blue had the ground and Brown had the street, and both are gone. Their last gift needs no memory: a second step in the air, and Shift to be somewhere else for a breath. The peddler is already waiting up the road.',
+      'Blue had the ground and Brown had the street, and both are gone. Their last gift costs no souls: a second step in the air, and Shift to be somewhere else for a breath. The peddler will be waiting where the next road begins.',
       '#9fc8ff',
     );
-    // The street is done, so the peddler sets up on the way out. She walks to
-    // his stall if she wants to, then walks on to the water.
-    if (!this.shopGiven) {
-      this.shopGiven = true;
-      this.level.arenaX = null;
-      this.level.teens = [];
-      this.openStall(this.player.x + 108);
-      return;
-    }
+    // The street is done. She walks on to the water.
+    this.level.arenaX = null;
+    this.level.teens = [];
     this.beginTransition();
   }
 
@@ -1869,9 +1929,13 @@ export class Game {
       facing: -1,
       stomp: 0,
     } : null;
+    // Her life is hers for the whole road: a new stage does not mend her.
+    this.lifeMax = 100 + 25 * this.upgradeCount('heart');
+    const startHP = this.lifeHP == null
+      ? this.lifeMax : clamp(this.lifeHP, 0, this.lifeMax);
     this.combat = {
-      hp: 100 + 25 * this.upgradeCount('heart'),
-      max: 100 + 25 * this.upgradeCount('heart'),
+      hp: startHP,
+      max: this.lifeMax,
       hurt: 0,
       invuln: 0,
       dogs,
@@ -2111,6 +2175,8 @@ export class Game {
     }
     c.shards = keep;
 
+    // Whatever she has left is what the next road starts with.
+    this.lifeHP = c.hp;
     if (c.hp <= 0) this.showWildsDown();
   }
 
@@ -2259,6 +2325,7 @@ export class Game {
     const c = this.combat;
     if (!c || c.invuln > 0 || this.mode === 'ending') return false;
     c.hp = Math.max(0, c.hp - amount);
+    this.lifeHP = c.hp;
     c.invuln = 0.9;
     c.hurt = 1;
     const p = this.player;
@@ -2487,6 +2554,7 @@ export class Game {
       this.defeatScorpion();
       return true;
     }
+    this.addSouls(this.rollSouls(), target.x, groundAt(this.level, target.x) - 16);
     this.audio.play('whisper');
     for (let i = 0; i < 20; i++) {
       const a = Math.random() * TAU;
@@ -2555,8 +2623,7 @@ export class Game {
         typed: 0,
       };
     }
-    // The boss is down. The peddler sets up in the space behind her.
-    this.openStall(this.player.x - 96);
+    // The boss is down. The peddler waits where the next road begins.
   }
 
   showWildsDown() {
@@ -4771,11 +4838,9 @@ export class Game {
     g.globalAlpha = 0.78;
     drawText(g, '*', x, y, { color: '#cfc6e4', scale: 1 });
     drawText(g, `${this.found.size}/${TOTAL_MEMORIES}`, x + 8, y, { color: '#a9a2bd', scale: 1 });
-    if (this.found.size > 0) {
-      drawText(g, `UNSPENT ${this.memory}`, x + 42, y, {
-        color: this.memory > 0 ? '#e4d9b8' : '#5d566e', scale: 1,
-      });
-    }
+    drawText(g, `SOULS ${this.souls}`, x + 42, y, {
+      color: this.souls > 0 ? '#ffd9a0' : '#5d566e', scale: 1,
+    });
     // the powers the bosses left her, each in its own colour
     let px = x;
     for (const pw of POWERS) {
@@ -4785,6 +4850,12 @@ export class Game {
       drawText(g, pw.name, px + 6, y + 11, { color: pw.color, scale: 1 });
       px += textWidth(pw.name, 1, 1) + 17;
     }
+    // her breath: running spends it, standing still gives it back
+    const sfrac = clamp(this.stamina / this.staminaMax, 0, 1);
+    g.fillStyle = 'rgba(6,8,14,0.7)';
+    g.fillRect(x, y + 22, 46, 4);
+    g.fillStyle = this.winded ? '#6b6478' : sfrac > 0.3 ? '#8fd0ff' : '#ffb066';
+    g.fillRect(x + 1, y + 23, Math.round(44 * sfrac), 2);
     g.restore();
 
     if (this.mutedNotice > 0) {
@@ -4924,6 +4995,12 @@ export class Game {
       const a = (1 - s / 1.6) * 0.12;
       g.fillStyle = rgba(this.memorySurge.color, a);
       g.fillRect(0, 0, W, H);
+    }
+    for (const pop of this.soulPops) {
+      const a = clamp(1 - pop.t / 1.1, 0, 1);
+      drawText(g, `+${pop.amount}`, pop.x - this.cam.x, pop.y - pop.t * 26, {
+        align: 'center', color: rgba('#ffd9a0', a), scale: 1, shadow: '#000000',
+      });
     }
     if (this.combat && this.combat.hurt > 0) {
       g.fillStyle = `rgba(255,48,32,${this.combat.hurt * 0.16})`;

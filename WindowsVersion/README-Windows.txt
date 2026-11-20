@@ -1,5 +1,18 @@
-THE LAST JOURNEY — Windows Edition (v1.9)
+THE LAST JOURNEY — Windows Edition (v2.0)
 =========================================
+
+WHAT'S NEW IN v2.0
+------------------
+- MEMORIES ARE SOULS NOW: every bot she puts down and every memory she
+  picks up pays ten to a hundred souls.
+- STAMINA AND RUNNING: hold Shift to sprint at nearly twice her walk. It
+  spends her breath, drawn under the souls counter; the dash is free.
+- THE SHOP IS ON EVERY ROAD, at the start of all eight stages.
+- HER HEALTH CARRIES BETWEEN STAGES. Only the peddler's refill (10 souls)
+  fills the bar again; a retry after death starts with a whole bar.
+- THE WARES: AUTOMATIC GUARDIAN (150 souls, once) and REFILL HER HEALTH
+  (10 souls, repeatable).
+- Same game as the web and Android 2.0 builds.
 
 A standalone Windows app: one .exe that opens the game in its own native
 window. No browser, no address bar, no internet connection, no install.
@@ -11,7 +24,7 @@ WHAT'S NEW IN v1.9
   Every memory she finds can go to the peddler now.
 - NEW WARE — AUTOMATIC BOT KILLER (2 memories): the two guardians kill any
   bot that comes near her by themselves. Never a boss.
-- Same game as the web and Android 1.9 builds.
+- Same game as the web and Android 1.9 builds (superseded by v2.0).
 
 WHAT'S NEW IN v1.8
 ------------------
@@ -40,7 +53,7 @@ CONTROLS
   Up / W / Space        jump (hold in mid-air to glide once learned)
   Down / S              duck
   E or Enter            interact / talk / collect / continue
-  Shift or J            dash (appears once unlocked)
+  Shift or J            dash (once unlocked); hold it to run
   X                     white shards (once unlocked)
   C                     light beam (hold; once unlocked)
   P or Escape           pause
@@ -50,7 +63,7 @@ CONTROLS
 Click the window once if the keyboard seems unresponsive — that also
 satisfies Windows' rule that audio may only start after an interaction.
 
-What's included: the same game as Android v1.9 — all levels and biomes,
+What's included: the same game as Android v2.0 — all levels and biomes,
 the powers, both boss battles, the voyage and the ending. The light beam
 ignites like a lightsaber, the shards ring like thrown shuriken, and the
 score turns to heavy metal once the two bosses are down.

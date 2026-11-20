@@ -36,6 +36,13 @@ int game_purse(void);
 int game_max_hp(void);
 int game_auto_kill(void);
 int game_bots_killed(void);
+int game_souls(void);
+int game_stamina(void);
+
+#ifdef GAME_TEST
+/* Host harness only: hand the run some souls so the wares can be exercised. */
+void game_test_souls(int n);
+#endif
 
 /* Extras for host tools and tests. */
 float game_ground_at(float x);

@@ -8,7 +8,7 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 OUT="${TMPDIR:-/tmp}/tlj_pocket"
 mkdir -p "$HERE/frames"
 
-cc -O2 -std=c99 -Wall -Wextra -I"$HERE/TheLastJourney" \
+cc -O2 -std=c99 -Wall -Wextra -DGAME_TEST -I"$HERE/TheLastJourney" \
   "$HERE/host/main_host.c" "$HERE/TheLastJourney/game.c" \
   -lm -o "$OUT"
 

@@ -19,33 +19,32 @@ CONTROLS
   LEFT / RIGHT   walk
   JUMP           jump (hold does nothing here; it is a plain jump)
   SHARD          throw a shard. Spiders die in one hit; touching one costs
-                 a heart.
+                 a heart. HOLD SHARD while walking and she runs: the sprint
+                 spends her breath (the thin bar under the hearts) and it
+                 comes back while she walks.
   Collect all four memories on a road, then reach its end to continue.
   Falling into a gap costs the whole run of that road.
 
-THE MEMORY PEDDLER
-------------------
-At the end of every road a stall opens before the next one: the peddler
-sells power and takes memories, so what she carries into the next road is
-her choice. The pocket edition has no bosses, so the stall stands in for
-the boss gate of the bigger versions.
+THE SOUL PEDDLER
+----------------
+At the FIRST of every road a stall stands, and its window opens before she
+takes a step: souls in, power out.
 
   LEFT / RIGHT   choose a ware
-  C              buy the chosen ware (memories are spent, not borrowed)
-  X              leave the stall and take the next road
+  C              buy the chosen ware (souls are spent, not borrowed)
+  X              leave the stall and take the road
 
-  EXTRA HEART          2 memories  one more heart, up to five, and she is mended
-  SWIFT BOOTS          1 memory    she runs faster on every road after this
-  LONG SHARDS          1 memory    her shards carry further before they fall
-  AUTOMATIC BOT KILLER 2 memories  two shadows kill any spider that comes
-                                   near her, without a button. Bought once.
-  LEAVE THE STALL                  walk on
+  AUTOMATIC GUARDIAN   150 souls  two shadows kill any spider that comes
+                                  near her, without a button. Bought once.
+  REFILL HER HEALTH     10 souls  her hearts fill to the brim again.
+                                  Buy it whenever she is hurt.
+  LEAVE THE STALL                 walk on
 
-The bot killer is the pocket edition's version of the guardians' sweep: the
-pocket game has no bosses, so there is nothing here it is not allowed to hit.
-
-Memories are a purse: each road's four pickups add to it, and only the
-stall spends it.
+Souls come off the spiders she puts down (the guardian's kills pay too) and
+they never vanish between roads: ten at the least, fifteen, twenty, thirty,
+fifty, and a hundred almost never. Her hearts do NOT refill at the start of
+a new road — only the stall mends her. A retry after a fall starts that road
+with a whole heart bar.
 
 HARDWARE
 --------
