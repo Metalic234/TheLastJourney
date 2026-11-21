@@ -236,7 +236,7 @@ const CONFIGS = [
     width: 4800,
     seed: 4493,
     spawnX: 42,
-    exitX: 4720,
+    exitX: 4770,
     cliffs: true,
     hostile: true,
     amp: 0.6,
@@ -265,10 +265,10 @@ const CONFIGS = [
     ],
     boss: {
       kind: 'dragon',
-      x: 4320,
+      x: 4195,
       triggerX: 4180,
       arenaMin: 4160,
-      arenaMax: 4690,
+      arenaMax: 4740,
       bridge: 3,
       name: 'THE WATER DRAGON',
       subtitle: 'KEEPER OF THE LAST BRIDGE',
@@ -284,13 +284,20 @@ const CONFIGS = [
       { x: 820, w: 200 },
       { x: 1900, w: 240 },
       { x: 2900, w: 240 },
-      { x: 4300, w: 320 },
+      { x: 4180, w: 540 },
     ],
     bridges: [
       { x: 800, w: 240, whale: false },
       { x: 1870, w: 300, whale: true },
       { x: 2880, w: 280, whale: false },
-      { x: 4280, w: 360, whale: false },
+      { x: 4240, w: 400, whale: false },
+    ],
+    // The sea runs under the last bridge and out past both of its ends, so
+    // the span cuts the water into two parts. Both lips are shallow: she can
+    // wade in from the cliff, and the dragon rides the water either side.
+    seas: [
+      { x: 4150, w: 90 },
+      { x: 4640, w: 110 },
     ],
     whaleBridge: 1,
     dolphinBridges: [0, 2],
@@ -965,6 +972,41 @@ function paintCliffs(level, g, rng) {
     if (gapAt(x)) continue;
     const gy = R(groundAt(level, x));
     treeSilhouette(g, x, gy, rand(rng, 14, 24), 'rgba(22,48,33,0.76)', rng, 0.85);
+  }
+
+  // the sea runs under the last bridge and out past both of its ends: one
+  // cold body of water that the span cuts in two
+  if (level.seas && level.seas.length) {
+    const firstSea = level.seas[0];
+    const lastSea = level.seas[level.seas.length - 1];
+    const seaX0 = firstSea.x;
+    const seaX1 = lastSea.x + lastSea.w;
+    const top = Math.round(firstSea.surface);
+    for (let x = seaX0; x < seaX1; x++) {
+      for (let y = top; y < H; y++) {
+        const t = (y - top) / Math.max(1, H - top);
+        g.fillStyle = mix('#2b6b69', '#041014', clamp(t * 1.15, 0, 1));
+        g.fillRect(x, y, 1, 1);
+      }
+      const swell = Math.round(Math.sin(x * 0.11) * 1.4);
+      g.fillStyle = 'rgba(224,250,244,0.6)';
+      g.fillRect(x, top + swell, 1, 1);
+      g.fillStyle = 'rgba(150,206,196,0.26)';
+      g.fillRect(x, top + 2 + swell, 1, 2);
+      // long slow swells rolling across the water
+      for (let k = 1; k <= 3; k++) {
+        const wv = Math.round(Math.sin(x * (0.035 + k * 0.012) + k * 2.1) * 2.4);
+        if ((x + k * 5) % (7 + k * 4) < 3) {
+          g.fillStyle = `rgba(168,220,210,${0.2 - k * 0.04})`;
+          g.fillRect(x, top + 6 + k * 11 + wv, 1, 1);
+        }
+      }
+      const lip = (x < seaX0 + 6) || (x > seaX1 - 7);
+      if (lip) {
+        g.fillStyle = 'rgba(226,248,244,0.32)';
+        g.fillRect(x, top + Math.round(Math.sin(x * 0.6)), 1, 2 + (x % 3));
+      }
+    }
   }
 
   // the bridges: old planks, rope rails, and a little moss
@@ -2416,6 +2458,7 @@ function buildFromConfig(cfg, index) {
     cliffs: !!cfg.cliffs,
     gaps: (cfg.gaps || []).map((gap) => ({ ...gap })),
     bridges: (cfg.bridges || []).map((bridge) => ({ ...bridge })),
+    seas: (cfg.seas || []).map((sea) => ({ ...sea })),
     whaleBridge: cfg.whaleBridge ?? null,
     dolphinBridges: (cfg.dolphinBridges || []).slice(),
   };
@@ -2427,6 +2470,16 @@ function buildFromConfig(cfg, index) {
     for (const bridge of level.bridges) bridge.y = groundAt(level, bridge.x + 2);
     for (const gap of level.gaps) {
       for (let x = gap.x; x < gap.x + gap.w; x++) level.ground[x] = H + 70;
+    }
+    // The sea beside the last bridge: the bridge deck is its own level, the
+    // water sits just under the planks, and its lips are shallow enough to
+    // wade. The dragon swims in it on either side of the span.
+    for (const sea of level.seas) {
+      const deck = level.bridges.find((b) => sea.x + sea.w >= b.x && sea.x <= b.x + b.w);
+      const base = deck ? deck.y : groundAt(level, sea.x + sea.w * 0.5);
+      sea.surface = base + 2;
+      sea.y = base + 8;
+      for (let x = sea.x; x < sea.x + sea.w; x++) level.ground[x] = sea.y;
     }
     for (const bridge of level.bridges) {
       level.solids.push({ x: bridge.x, y: bridge.y - 2, w: bridge.w, h: 6 });

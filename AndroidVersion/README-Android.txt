@@ -1,5 +1,16 @@
-THE LAST JOURNEY — Android Edition (v2.1.0)
+THE LAST JOURNEY — Android Edition (v2.1.1)
 ============================================
+
+WHAT'S NEW IN v2.1.1
+--------------------
+- THE WATER DRAGON LEAPS THE SEA, NOT THE BRIDGE. The last span now stands
+  over open water: the sea runs under it and out past both of its ends, so
+  the bridge cuts the water in two. The dragon rides the water on one side,
+  leaps the whole span, and comes down in the water on the other side — it
+  never stands on the planks. Every second landing still brings the Steam
+  Blast, and now it runs the full span, so neither end of the bridge is
+  safe.
+- Same release key as v2.1.0: versionName 2.1.1, versionCode 14.
 
 WHAT'S NEW IN v2.1.0
 --------------------

@@ -39,23 +39,29 @@ typedef struct {
   int gap_count;
   Gap gaps[4];
   uint32_t sky_top, sky_bot, hill_far, hill_near, dirt, grass, stone;
+  /* The last road ends on a bridge over the sea; the span cuts the water in
+   * two and the keeper rides either half of it. 0/0 = no bridge. */
+  float bridge_x0, bridge_x1;
 } StageCfg;
 
 static const StageCfg STAGES[3] = {
   {
     "THE ENCHANTED FOREST", 2100.0f, 2,
     { { 640, 686 }, { 1080, 1126 } },
-    0x101A33, 0x51708F, 0x18301F, 0x24452C, 0x2A1E14, 0x4C7A3A, 0x1B120C
+    0x101A33, 0x51708F, 0x18301F, 0x24452C, 0x2A1E14, 0x4C7A3A, 0x1B120C,
+    0.0f, 0.0f
   },
   {
     "THE DROWNED RUINS", 2400.0f, 3,
     { { 520, 566 }, { 900, 946 }, { 1320, 1366 } },
-    0x1C1226, 0x7A4A5A, 0x261E33, 0x392C46, 0x2E2836, 0x67607A, 0x1A1620
+    0x1C1226, 0x7A4A5A, 0x261E33, 0x392C46, 0x2E2836, 0x67607A, 0x1A1620,
+    0.0f, 0.0f
   },
   {
     "THE BURNING CITY", 2700.0f, 4,
     { { 430, 476 }, { 760, 806 }, { 1150, 1196 }, { 1560, 1606 } },
-    0x160B10, 0x8A3A26, 0x24161A, 0x3B2020, 0x2A1A18, 0x8A4A2A, 0x140C0A
+    0x160B10, 0x8A3A26, 0x24161A, 0x3B2020, 0x2A1A18, 0x8A4A2A, 0x140C0A,
+    2050.0f, 2270.0f
   },
 };
 
@@ -66,6 +72,10 @@ static int8_t hill_near[GND_MAX];
 static int gnd_n;
 static int stage_i;
 static float stage_len;
+/* the bridge over the last road's sea */
+#define SEA_W 44.0f
+static float bridge_x0, bridge_x1, arena_y, sea_y;
+static int has_bridge;
 
 static uint16_t sky_row[H];
 static uint16_t col_hill_far, col_hill_near, col_dirt, col_grass, col_stone;
@@ -322,6 +332,25 @@ static void reset_stage(int idx) {
     hill_near[i] = (int8_t)(10.0f + sinf(wx * 0.013f + idx * 2.0f) * 6.0f);
   }
 
+  bridge_x0 = cfg->bridge_x0;
+  bridge_x1 = cfg->bridge_x1;
+  has_bridge = bridge_x1 > bridge_x0 + 1.0f;
+  arena_y = 0.0f;
+  sea_y = 0.0f;
+  if (has_bridge) {
+    int bx;
+    /* The span is level and the sea comes up just under its planks, so the
+     * bridge cuts the water in two. Both lips are shallow enough to wade. */
+    arena_y = ground_y((bridge_x0 + bridge_x1) * 0.5f);
+    sea_y = arena_y + 2.0f;
+    for (bx = (int)bridge_x0; bx <= (int)bridge_x1; bx++)
+      gnd[gi((float)bx)] = (int16_t)arena_y;
+    for (bx = (int)(bridge_x0 - SEA_W); bx < (int)bridge_x0; bx++)
+      if (bx >= 0 && bx < gnd_n) gnd[gi((float)bx)] = (int16_t)(arena_y + 8.0f);
+    for (bx = (int)bridge_x1 + 1; bx <= (int)(bridge_x1 + SEA_W); bx++)
+      if (bx >= 0 && bx < gnd_n) gnd[gi((float)bx)] = (int16_t)(arena_y + 8.0f);
+  }
+
   col_hill_far = to565(cfg->hill_far);
   col_hill_near = to565(cfg->hill_near);
   col_dirt = to565(cfg->dirt);
@@ -396,6 +425,8 @@ static void reset_stage(int idx) {
   boss.active = 0;
   boss.x = stage_len * 0.80f;
   boss.home = boss.x;
+  /* the dragon starts in the sea on the near side of its bridge */
+  if (boss.kind == 2 && has_bridge) boss.x = boss.home - 132.0f;
   boss.base_y = 0.0f;
   boss.facing = -1;
   boss.intro = 1.2f;
@@ -481,8 +512,8 @@ static void update_boss(float dt) {
   }
   if (boss.flash > 0.0f) boss.flash -= dt;
   if (boss.steam_burst > 0.0f) boss.steam_burst -= dt;
+  boss.base_y = (boss.kind == 2 && has_bridge) ? sea_y : ground_y(boss.x);
   if (boss.intro > 0.0f) { boss.intro -= dt; return; }
-  boss.base_y = ground_y(boss.x);
   boss.facing = (p.x < boss.x) ? -1 : 1;
   ad = fabsf(p.x - boss.x);
 
@@ -513,12 +544,18 @@ static void update_boss(float dt) {
       boss.cd = 1.5f;
     }
   } else {
-    /* the water dragon: hops the span, and every second landing breathes */
+    /* the water dragon: leaps from the sea on one side of the bridge into the
+     * sea on the other, and every second landing breathes */
     if (boss.steam_t > 0.0f) {
       boss.steam_t -= dt;
       if (boss.steam_t <= 0.0f) {
         boss.steam_burst = 0.5f;
-        if (ad < 170.0f) hurt(1);
+        /* it runs the whole span: neither end of the bridge is safe */
+        if (has_bridge) {
+          if (p.x > bridge_x0 - 20.0f && p.x < bridge_x1 + 20.0f) hurt(1);
+        } else if (ad < 170.0f) {
+          hurt(1);
+        }
       }
       return;
     }
@@ -527,7 +564,7 @@ static void update_boss(float dt) {
       boss.hop_t -= dt;
       k = 1.0f - boss.hop_t / 0.9f;
       boss.x = boss.hop_from + (boss.hop_to - boss.hop_from) * k;
-      boss.lift = sinf(k * 3.14159f) * 26.0f;
+      boss.lift = sinf(k * 3.14159f) * 34.0f;
       if (boss.hop_t <= 0.0f) {
         boss.lift = 0.0f;
         boss.hops++;
@@ -540,7 +577,7 @@ static void update_boss(float dt) {
     boss.cd -= dt;
     if (boss.cd <= 0.0f) {
       boss.hop_from = boss.x;
-      boss.hop_to = (boss.x < boss.home) ? boss.home + 130.0f : boss.home - 130.0f;
+      boss.hop_to = (boss.x < boss.home) ? boss.home + 132.0f : boss.home - 132.0f;
       boss.hop_to = clampf(boss.hop_to, 24.0f, stage_len - 24.0f);
       boss.hop_t = 0.9f;
       boss.cd = 0.8f;
@@ -689,7 +726,7 @@ static void update_play(float dt, GameInput in, int jump_pressed, int action_pre
     /* The keeper holds the end of the road: she cannot walk past it. */
     if (p.x > boss.home + 70.0f) p.x = boss.home + 70.0f;
     {
-      float bhit_y = ground_y(boss.x) - 20.0f - boss.lift;
+      float bhit_y = boss.base_y - 20.0f - boss.lift;
       for (i = 0; i < MAX_SHARDS; i++) {
         if (!shards[i].live) continue;
         if (fabsf(shards[i].x - boss.x) < 24.0f && fabsf(shards[i].y - bhit_y) < 30.0f) {
@@ -747,11 +784,34 @@ static void draw_world(void) {
 
   for (x = 0; x < W; x++) {
     float wx = cam + x;
-    int g = gnd[gi(wx)];
+    int g;
+    if (has_bridge && wx >= bridge_x0 - SEA_W - 1.0f && wx <= bridge_x1 + SEA_W + 1.0f) continue;
+    g = gnd[gi(wx)];
     if (g >= H || g >= 300) continue;
     rect(x, g, 1, H - g, col_dirt);
     px(x, g, col_grass);
     if ((((int)wx / 2) % 17) == 0) px(x, g + 5, col_stone);
+  }
+
+  if (has_bridge) {
+    /* the sea either side of the bridge, and the plank span between them */
+    int bx0 = (int)(bridge_x0 - cam);
+    int bx1 = (int)(bridge_x1 - cam);
+    int wy = (int)sea_y;
+    for (x = bx0 - (int)SEA_W; x < bx1 + (int)SEA_W; x++) {
+      if (x < 0 || x >= W) continue;
+      rect(x, wy, 1, H - wy, to565(0x10343C));
+      px(x, wy, ((x >> 1) & 1) ? to565(0x8FC9BF) : to565(0x2E6A68));
+      if ((x % 9) == 0) px(x, wy + 4, to565(0x1D5A60));
+    }
+    for (x = bx0; x < bx1; x++) {
+      if (x < 0 || x >= W) continue;
+      rect(x, wy - 4, 1, 4, ((x >> 1) & 1) ? to565(0x6A4A2A) : to565(0x8A6238));
+      if ((x % 11) == 0) {
+        rect(x, wy - 8, 1, 5, to565(0x3A2A1A));
+        px(x, wy - 9, to565(0x9AB07A));
+      }
+    }
   }
 
   for (i = 0; i < mem_n; i++) {
@@ -834,7 +894,7 @@ static void draw_boss(void) {
   if (!boss.alive) return;
   bx = (int)(boss.x - cam);
   if (bx < -60 || bx > W + 60) return;
-  by = (int)(ground_y(boss.x) - boss.lift);
+  by = (int)(((boss.kind == 2 && boss.base_y > 1.0f) ? boss.base_y : ground_y(boss.x)) - boss.lift);
   if (boss.kind == 1) {
     rect(bx - 9, by - 30, 18, 22, to565(0xB4651C));
     rect(bx - 7, by - 34, 14, 8, to565(0xD08634));

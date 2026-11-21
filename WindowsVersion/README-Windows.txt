@@ -1,5 +1,15 @@
-THE LAST JOURNEY — Windows Edition (v2.1.0)
+THE LAST JOURNEY — Windows Edition (v2.1.1)
 ===========================================
+
+WHAT'S NEW IN v2.1.1
+--------------------
+- THE WATER DRAGON LEAPS THE SEA, NOT THE BRIDGE. The last span stands over
+  open water now: the sea runs under the bridge and out past both of its
+  ends, so the bridge cuts the water in two. The dragon rides the water on
+  one side, leaps the whole span, and lands with a splash in the water on
+  the other — never on the planks. The Steam Blast still comes after every
+  second landing, and now it runs the full span.
+- Same release key / save-free install as v2.1.0: version 2.1.1.
 
 WHAT'S NEW IN v2.1.0
 --------------------

@@ -1943,6 +1943,8 @@ export class Game {
     };
     const homeBridge = cfg && kind === 'dragon' && L.bridges
       ? L.bridges[cfg.bridge ?? L.bridges.length - 1] : null;
+    const homeSea = cfg && kind === 'dragon' && L.seas && L.seas.length
+      ? L.seas[0] : null;
     const boss = cfg ? {
       id: kind,
       kind,
@@ -1974,7 +1976,7 @@ export class Game {
       pounceT: 0,
       pounceMax: 0.55,
       pounceX: cfg.x,
-      baseY: homeBridge ? homeBridge.y : null,
+      baseY: homeSea ? homeSea.surface : (homeBridge ? homeBridge.y : null),
       jumpT: 0,
       jumpMax: 1.0,
       jumpFrom: cfg.x,
@@ -2461,9 +2463,18 @@ export class Game {
     const L = this.level;
     const p = this.player;
     const bridge = L.bridges && L.bridges[b.bridge ?? -1];
-    const sideL = bridge ? bridge.x + 26 : L.boss.arenaMin + 40;
-    const sideR = bridge ? bridge.x + bridge.w - 26 : L.boss.arenaMax - 40;
-    if (bridge) b.baseY = bridge.y;
+    // The bridge cuts the sea in two. The dragon lives in the water on one
+    // side of it and leaps the whole span into the water on the other: never
+    // on the planks themselves.
+    const seas = L.seas || [];
+    const seaL = seas.length ? seas[0] : null;
+    const seaR = seas.length > 1 ? seas[seas.length - 1] : null;
+    const sideL = seaL ? seaL.x + seaL.w * 0.5
+      : (bridge ? bridge.x + 26 : L.boss.arenaMin + 40);
+    const sideR = seaR ? seaR.x + seaR.w * 0.5
+      : (bridge ? bridge.x + bridge.w - 26 : L.boss.arenaMax - 40);
+    if (seaL) b.baseY = seaL.surface;
+    else if (bridge) b.baseY = bridge.y;
     b.flash = Math.max(0, b.flash - dt * 3.8);
     b.stomp = Math.max(0, b.stomp - dt);
     b.intro = Math.max(0, b.intro - dt);
@@ -2495,8 +2506,12 @@ export class Game {
             drag: 0.94,
           });
         }
-        // An eighth of her: the blast is not something she can shrug off.
-        if (Math.abs(p.x - b.x) < 300) this.hurtWilds(13, b.x);
+        // An eighth of her: the blast runs the whole span, so standing at
+        // either end of the bridge does not save her.
+        if (Math.abs(p.x - b.x) < 300
+          || (p.x > L.boss.arenaMin - 40 && p.x < L.boss.arenaMax + 40)) {
+          this.hurtWilds(13, b.x);
+        }
       }
       return;
     }
@@ -2505,11 +2520,26 @@ export class Game {
       b.jumpT = Math.max(0, b.jumpT - dt);
       const k = 1 - b.jumpT / b.jumpMax;
       b.x = lerp(b.jumpFrom, b.jumpTo, k);
-      b.lift = Math.sin(k * Math.PI) * 62;
+      b.lift = Math.sin(k * Math.PI) * 74;
       if (b.jumpT <= 0) {
         b.lift = 0;
         b.stomp = 0.4;
         b.hops = (b.hops || 0) + 1;
+        // It comes down in the water: a ring of spray goes up around it.
+        for (let i = 0; i < 16; i++) {
+          this.spawn({
+            type: i % 2 ? 'smoke' : 'mote',
+            x: b.x + (Math.random() - 0.5) * 30,
+            y: b.baseY - 2,
+            vx: (Math.random() - 0.5) * 52,
+            vy: -22 - Math.random() * 54,
+            size: 1 + Math.floor(Math.random() * 2),
+            color: i % 3 ? '#cfeae4' : '#ffffff',
+            max: 0.35 + Math.random() * 0.4,
+            grav: 92,
+            drag: 0.95,
+          });
+        }
         // Every second crossing, the steam comes out.
         if (b.hops % 2 === 0) {
           b.steamT = b.steamMax;
@@ -2620,7 +2650,8 @@ export class Game {
     // way the girl happens to be facing.
     const bossFocus = c.boss && c.boss.active && c.boss.alive ? c.boss : null;
     let target = bossFocus;
-    let best = bossFocus ? Infinity : 430;
+    // With a boss standing, nothing else can steal the shards from it.
+    let best = bossFocus ? 0 : 430;
     for (const dog of c.dogs) {
       if (!dog.alive) continue;
       const d = Math.abs(dog.x - p.x);
@@ -4126,13 +4157,28 @@ export class Game {
             g.restore();
           }
         } else if (boss.kind === 'dragon') {
-          drawWaterDragon(g, bx, (boss.baseY ?? groundAt(L, boss.x)) - (boss.lift || 0), this.time, {
+          const seaY = boss.baseY ?? groundAt(L, boss.x);
+          drawWaterDragon(g, bx, seaY - (boss.lift || 0), this.time, {
             scale: 1.06,
             facing: boss.facing,
             flash: boss.flash,
             steam: boss.steamT > 0 ? 1 - boss.steamT / boss.steamMax : 0,
             bite: boss.jumpT > 0 ? 1 : 0,
           });
+          // While it rides the sea, a ring of swell goes round its body.
+          if (L.seas && L.seas.length && boss.jumpT <= 0 && boss.steamT <= 0) {
+            g.save();
+            g.strokeStyle = '#cfeae4';
+            g.lineWidth = 1;
+            for (let i = 0; i < 2; i++) {
+              const k = (this.time * 0.65 + i * 0.5) % 1;
+              g.globalAlpha = 0.42 * (1 - k);
+              g.beginPath();
+              g.ellipse(bx, seaY, 22 + k * 34, 3 + k * 4, 0, 0, TAU);
+              g.stroke();
+            }
+            g.restore();
+          }
           // the blast itself: a wall of steam coming off the bridge
           if (boss.steamBurst > 0) {
             const k = 1 - clamp(boss.steamBurst / 0.55, 0, 1);

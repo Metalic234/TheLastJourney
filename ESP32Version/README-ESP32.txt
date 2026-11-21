@@ -34,9 +34,13 @@ and cannot be walked past.
 
   THE TIGER OF THE RUINS   ends the drowned ruins. It stalks her on two
                            legs, swipes when close, and leaps at her.
-  THE WATER DRAGON         ends the burning city. It hops from one end of
-                           its span to the other, and after every second
-                           landing a Steam Blast takes a heart.
+  THE WATER DRAGON         ends the burning city. The last road crosses a
+                           low bridge over the sea, and the span cuts the
+                           water in two: the dragon rides the water on one
+                           side of it, leaps the whole bridge, and lands in
+                           the water on the other, never on the planks.
+                           After every second landing a Steam Blast runs the
+                           span and takes a heart.
 
 Shards wear a keeper down; its health bar sits at the top of the screen.
 Both of them are worth a payout from the road's soul purse, and the road
