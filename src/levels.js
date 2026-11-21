@@ -265,10 +265,10 @@ const CONFIGS = [
     ],
     boss: {
       kind: 'dragon',
-      x: 4195,
-      triggerX: 4180,
-      arenaMin: 4160,
-      arenaMax: 4740,
+      x: 4125,
+      triggerX: 4060,
+      arenaMin: 4050,
+      arenaMax: 4780,
       bridge: 3,
       name: 'THE WATER DRAGON',
       subtitle: 'KEEPER OF THE LAST BRIDGE',
@@ -284,20 +284,22 @@ const CONFIGS = [
       { x: 820, w: 200 },
       { x: 1900, w: 240 },
       { x: 2900, w: 240 },
-      { x: 4180, w: 540 },
+      { x: 4180, w: 520 },
     ],
     bridges: [
       { x: 800, w: 240, whale: false },
       { x: 1870, w: 300, whale: true },
       { x: 2880, w: 280, whale: false },
-      { x: 4240, w: 400, whale: false },
+      // The last bridge is one unbroken deck across the whole cut: the fight
+      // happens on the planks, and there is no hole in it to fall through.
+      { x: 4180, w: 520, whale: false },
     ],
     // The sea runs under the last bridge and out past both of its ends, so
     // the span cuts the water into two parts. Both lips are shallow: she can
     // wade in from the cliff, and the dragon rides the water either side.
     seas: [
-      { x: 4150, w: 90 },
-      { x: 4640, w: 110 },
+      { x: 4070, w: 110 },
+      { x: 4700, w: 60 },
     ],
     whaleBridge: 1,
     dolphinBridges: [0, 2],

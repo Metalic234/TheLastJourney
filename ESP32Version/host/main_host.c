@@ -68,22 +68,26 @@ int main(int argc, char **argv) {
                  game_stage(), f, game_souls(), game_hp(), game_max_hp());
         }
         if (shop_frames == 3 || shop_frames == 5) in.right = 1;
-        if (shop_frames == 7) in.action = 1;
+        if (shop_frames == 7) in.jump = 1;   /* leave the stall */
       } else if (shop_visits == 2) {
-        /* stage II: buy the guardian, never the boss-killer */
-        if (shop_frames == 1) game_test_souls(200);
-        if (shop_frames == 2) in.action = 1;
-        if (shop_frames == 3) {
-          printf("guardian owned %d souls %d\n", game_auto_kill(), game_souls());
+        /* stage II: buy the ward and all three elements, then the guardian */
+        if (shop_frames == 1) game_test_souls(400);
+        if (shop_frames >= 2 && shop_frames <= 14) {
+          if ((shop_frames % 2) == 0) in.action = 1;
+          else in.right = 1;
+        }
+        if (shop_frames == 2) write_ppm(dir, 9999);
+        if (shop_frames == 13) {
+          printf("ward owned %d on hand %d powers %d guardian %d souls %d\n",
+                 game_shield_owned(), game_shield(), game_powers(),
+                 game_auto_kill(), game_souls());
           hp_at_stage[1] = game_hp();
         }
-        if (shop_frames == 4 || shop_frames == 6) in.right = 1;
-        if (shop_frames == 8) in.action = 1;
       } else {
         /* later roads: look, then go */
         if (shop_frames == 2) hp_at_stage[2] = game_hp();
         if (shop_frames == 3 || shop_frames == 5) in.right = 1;
-        if (shop_frames == 7) in.action = 1;
+        if (shop_frames == 7) in.jump = 1;
       }
       game_update(dt, in);
       continue;

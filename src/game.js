@@ -20,6 +20,22 @@ const PH = 18; // player body height
 const DASH_SPEED = 250;
 const DASH_TIME = 0.18;
 const DASH_COOLDOWN = 0.75;
+// The peddler's ward: a bar of its own above her life, spent before her body.
+const SHIELD_MAX = 26;
+// How fast an ice-marked foe still moves.
+const foeSpeed = (foe) => (foe && foe.ice > 0 ? 0.55 : 1);
+
+// Her bar runs purple at full, then down through blue, green, yellow and
+// orange to red. At nothing there is no colour left at all: it is black.
+function healthColor(frac) {
+  if (frac <= 0) return '#000000';
+  if (frac >= 0.999) return '#b06cff';
+  if (frac > 0.75) return '#4f8dff';
+  if (frac > 0.5) return '#4fd06a';
+  if (frac > 0.3) return '#ffd84f';
+  if (frac > 0.15) return '#ff9838';
+  return '#ff4a3c';
+}
 
 const SKY = {
   forest: [[0, '#04070e'], [0.35, '#0a1420'], [0.7, '#152838'], [1, '#1e3843']],
@@ -839,6 +855,154 @@ export class Game {
     return this.bought.get(id) || 0;
   }
 
+  // ---- the peddler's elements -------------------------------------------
+  // Each of the three X powers is hers for good once bought. Any two of them
+  // feed each other, and all three turn her shards into vapour and shock.
+  powerCount() {
+    return ['fire', 'ice', 'elec'].filter((id) => this.upgradeCount(id) > 0).length;
+  }
+
+  powerBonus() {
+    let mult = 1;
+    if (this.upgradeCount('fire') > 0) mult += 0.15;
+    if (this.upgradeCount('ice') > 0) mult += 0.14;
+    if (this.upgradeCount('elec') > 0) mult += 0.18;
+    const n = this.powerCount();
+    if (n === 2) mult += 0.1;
+    if (n === 3) mult += 0.25;
+    return mult;
+  }
+
+  powerName() {
+    const n = this.powerCount();
+    if (n === 0) return '';
+    if (n === 3) return 'VAPOUR AND SHOCK';
+    if (n === 2) {
+      const fire = this.upgradeCount('fire') > 0;
+      const ice = this.upgradeCount('ice') > 0;
+      if (fire && ice) return 'HOT MIST';
+      if (fire) return 'PLASMA';
+      if (ice) return 'STORM';
+      return 'CHARGED AIR';
+    }
+    return this.upgradeCount('fire') > 0 ? 'FIRE'
+      : this.upgradeCount('ice') > 0 ? 'ICE' : 'ELECTRIC';
+  }
+
+  // What a shard leaves on the thing it hits: fire burns, ice slows, the
+  // charge clings and jumps.
+  markFoe(foe) {
+    if (!foe) return;
+    if (this.upgradeCount('fire') > 0) foe.burn = 4;
+    if (this.upgradeCount('ice') > 0) foe.ice = 3.2;
+    if (this.upgradeCount('elec') > 0) foe.shock = 1.4;
+  }
+
+  // The charge jumps to whatever stands near, and the mist comes off it.
+  shockArc(foe, amount) {
+    const c = this.combat;
+    if (!c || !foe) return;
+    const foes = [];
+    for (const dog of c.dogs) if (dog.alive && dog !== foe) foes.push(dog);
+    for (const spider of c.spiders) if (spider.alive && spider !== foe) foes.push(spider);
+    for (const crab of c.crabs) if (crab.alive && crab !== foe) foes.push(crab);
+    if (c.boss && c.boss.active && c.boss.alive && c.boss !== foe) foes.push(c.boss);
+    foes.sort((a, b) => Math.abs(a.x - foe.x) - Math.abs(b.x - foe.x));
+    const reach = this.powerCount() >= 3 ? 2 : 1;
+    const fy = foe === c.boss ? this.bossAimY(foe) : groundAt(this.level, foe.x) - 12;
+    for (let i = 0; i < Math.min(reach, foes.length); i++) {
+      const other = foes[i];
+      if (Math.abs(other.x - foe.x) > 150) continue;
+      const oy = other === c.boss ? this.bossAimY(other) : groundAt(this.level, other.x) - 12;
+      for (let k = 0; k < 8; k++) {
+        const t = k / 7;
+        this.spawn({
+          type: 'spark',
+          x: lerp(foe.x, other.x, t),
+          y: lerp(fy, oy, t) + Math.sin(t * 9 + this.time * 20) * 5,
+          vx: 0,
+          vy: 0,
+          size: 1,
+          color: k % 2 ? '#bfeaff' : '#ffffff',
+          max: 0.18,
+          drag: 0.9,
+        });
+      }
+      this.damageWilds(other, Math.max(0.5, amount * 0.3), other.x, oy);
+    }
+  }
+
+  // Burning and frost and charge, paid out every frame rather than on the hit.
+  tickElements(dt) {
+    const c = this.combat;
+    if (!c) return;
+    const L = this.level;
+    const foes = [];
+    for (const dog of c.dogs) if (dog.alive) foes.push(dog);
+    for (const spider of c.spiders) if (spider.alive) foes.push(spider);
+    for (const crab of c.crabs) if (crab.alive) foes.push(crab);
+    if (c.boss && c.boss.active && c.boss.alive) foes.push(c.boss);
+    for (const foe of foes) {
+      const y = foe === c.boss ? this.bossAimY(foe) : groundAt(L, foe.x) - 12;
+      if (foe.burn > 0) {
+        foe.burn = Math.max(0, foe.burn - dt);
+        // Two percent of everything it has, every second.
+        foe.hp = Math.max(0, foe.hp - (foe.maxHp || 10) * 0.02 * dt);
+        if (Math.random() < dt * 12) {
+          this.spawn({
+            type: 'mote',
+            x: foe.x + (Math.random() - 0.5) * 18,
+            y,
+            vx: (Math.random() - 0.5) * 18,
+            vy: -14 - Math.random() * 20,
+            size: 1,
+            color: Math.random() < 0.5 ? '#ff9a3c' : '#ffd166',
+            max: 0.45,
+            grav: -12,
+            drag: 0.96,
+          });
+        }
+        if (foe.hp <= 0) {
+          this.damageWilds(foe, 0, foe.x, y);
+          continue;
+        }
+      }
+      if (foe.ice > 0) {
+        foe.ice = Math.max(0, foe.ice - dt);
+        if (Math.random() < dt * 6) {
+          this.spawn({
+            type: 'mote',
+            x: foe.x + (Math.random() - 0.5) * 16,
+            y: y + (Math.random() - 0.5) * 10,
+            vx: (Math.random() - 0.5) * 10,
+            vy: 8,
+            size: 1,
+            color: '#cfeaff',
+            max: 0.5,
+            grav: 10,
+            drag: 0.97,
+          });
+        }
+      }
+      if (foe.shock > 0) {
+        foe.shock = Math.max(0, foe.shock - dt);
+        if (Math.random() < dt * 9) {
+          this.spawn({
+            type: 'spark',
+            x: foe.x + (Math.random() - 0.5) * 20,
+            y: y + (Math.random() - 0.5) * 14,
+            vx: (Math.random() - 0.5) * 30,
+            vy: -Math.random() * 20,
+            size: 1,
+            color: '#bfeaff',
+            max: 0.16,
+            drag: 0.9,
+          });
+        }
+      }
+    }
+  }
+
   // The duel uses the same life she carries between roads.
   heroVitals() {
     const max = 100;
@@ -924,6 +1088,10 @@ export class Game {
   }
 
   applyUpgrade(id) {
+    if (id === 'shield') {
+      if (this.combat) this.combat.shield = this.combat.shieldMax;
+      return;
+    }
     if (id !== 'heal') return;
     // The peddler's cheapest ware: her breath, all of it, back in her chest.
     if (this.combat) this.combat.hp = this.combat.max;
@@ -1984,7 +2152,7 @@ export class Game {
       lift: 0,
       hops: 0,
       steamT: 0,
-      steamMax: 0.75,
+      steamMax: 0.85,
       steamHit: true,
       steamBurst: 0,
     } : null;
@@ -1997,6 +2165,8 @@ export class Game {
       max: this.lifeMax,
       hurt: 0,
       invuln: 0,
+      shield: this.upgradeCount('shield') > 0 ? SHIELD_MAX : 0,
+      shieldMax: SHIELD_MAX,
       dogs,
       spiders,
       crabs,
@@ -2050,6 +2220,7 @@ export class Game {
     const p = this.player;
     c.invuln = Math.max(0, c.invuln - dt);
     c.hurt = Math.max(0, c.hurt - dt * 2.2);
+    this.tickElements(dt);
 
     if (!c.bossStarted && c.boss && p.x >= L.boss.triggerX) this.startScorpion();
     if (c.bossStarted && c.boss && c.boss.alive) {
@@ -2066,7 +2237,7 @@ export class Game {
       if (close) {
         dog.moving = true;
         dog.dir = Math.sign(dx) || dog.dir;
-        dog.x += dog.dir * 38 * dt;
+        dog.x += dog.dir * 38 * dt * foeSpeed(dog);
         if (Math.abs(dx) < 23 && Math.abs(p.y - gy) < 26 && dog.biteCd <= 0) {
           this.audio.play('dogBite');
           this.hurtWilds(7, dog.x);
@@ -2081,7 +2252,7 @@ export class Game {
             dog.pause = 0.7 + Math.random() * 1.1;
           }
         }
-        dog.x += dog.dir * 12 * dt;
+        dog.x += dog.dir * 12 * dt * foeSpeed(dog);
         dog.moving = true;
       }
       dog.x = clamp(dog.x, 16, L.width - 16);
@@ -2105,7 +2276,7 @@ export class Game {
           if (this.hurtWilds(6, crab.x)) crab.pinchT = 0.22;
           crab.biteCd = 1.1;
         }
-        if (Math.abs(dx) > 17) crab.x += crab.dir * 34 * dt;
+        if (Math.abs(dx) > 17) crab.x += crab.dir * 34 * dt * foeSpeed(crab);
       } else {
         crab.pause -= dt;
         if (crab.pause <= 0) {
@@ -2115,7 +2286,7 @@ export class Game {
             crab.pause = 0.55 + Math.random() * 0.9;
           }
         }
-        crab.x += crab.dir * 15 * dt;
+        crab.x += crab.dir * 15 * dt * foeSpeed(crab);
       }
       crab.x = clamp(crab.x, 16, L.width - 16);
     }
@@ -2133,7 +2304,7 @@ export class Game {
       if (spider.lungeT > 0) {
         spider.lungeT = Math.max(0, spider.lungeT - dt);
         spider.moving = true;
-        spider.x += spider.dir * 180 * dt;
+        spider.x += spider.dir * 180 * dt * foeSpeed(spider);
         if (!spider.lungeHit && Math.abs(p.x - spider.x) < 22 && Math.abs(p.y - gy) < 30) {
           spider.lungeHit = true;
           if (this.hurtWilds(8, spider.x)) this.audio.play('spiderBite');
@@ -2153,7 +2324,7 @@ export class Game {
           spider.lungeCd = 1.7;
           this.audio.play('spiderHiss');
         } else {
-          spider.x += spider.dir * 48 * dt;
+          spider.x += spider.dir * 48 * dt * foeSpeed(spider);
         }
       } else {
         spider.pause -= dt;
@@ -2164,7 +2335,7 @@ export class Game {
             spider.pause = 0.45 + Math.random() * 0.9;
           }
         }
-        spider.x += spider.dir * 15 * dt;
+        spider.x += spider.dir * 15 * dt * foeSpeed(spider);
         spider.moving = true;
       }
       spider.x = clamp(spider.x, 16, L.width - 16);
@@ -2221,7 +2392,7 @@ export class Game {
       shard.x += shard.vx * dt;
       shard.y += shard.vy * dt;
       if (Math.hypot(target.x - shard.x, ty - shard.y) < 15) {
-        this.damageWilds(target, 1, shard.x, shard.y);
+        this.damageWilds(target, 1, shard.x, shard.y, { elemental: true });
         continue;
       }
       keep.push(shard);
@@ -2506,11 +2677,12 @@ export class Game {
             drag: 0.94,
           });
         }
-        // An eighth of her: the blast runs the whole span, so standing at
-        // either end of the bridge does not save her.
-        if (Math.abs(p.x - b.x) < 300
-          || (p.x > L.boss.arenaMin - 40 && p.x < L.boss.arenaMax + 40)) {
-          this.hurtWilds(13, b.x);
+        // The blast runs the whole span, so the ends of the bridge save
+        // nobody. It rolls low along the planks, though: a jump carries her
+        // over it while it passes underneath.
+        const airborne = !p.onGround && p.y < groundAt(L, p.x) - 8;
+        if (!airborne && p.x > L.boss.arenaMin - 40 && p.x < L.boss.arenaMax + 40) {
+          this.hurtWilds(9, b.x);
         }
       }
       return;
@@ -2540,8 +2712,8 @@ export class Game {
             drag: 0.95,
           });
         }
-        // Every second crossing, the steam comes out.
-        if (b.hops % 2 === 0) {
+        // Every third crossing, the steam comes out.
+        if (b.hops % 3 === 0) {
           b.steamT = b.steamMax;
           b.steamHit = false;
           this.audio.play('blueCharge');
@@ -2557,7 +2729,7 @@ export class Game {
     if (Math.abs(dx) < 56 && c.invuln <= 0 && Math.abs(p.y - b.baseY) < 42) {
       this.hurtWilds(9, b.x);
     }
-    b.attackCd -= dt;
+    b.attackCd -= dt * foeSpeed(b);
     if (b.attackCd <= 0) {
       const mid = (sideL + sideR) * 0.5;
       b.jumpFrom = b.x;
@@ -2570,6 +2742,32 @@ export class Game {
   hurtWilds(amount, sourceX) {
     const c = this.combat;
     if (!c || c.invuln > 0 || this.mode === 'ending') return false;
+    // The ward the peddler sells takes the blow first, then it is spent.
+    if (c.shield > 0) {
+      const absorbed = Math.min(c.shield, amount);
+      c.shield -= absorbed;
+      amount -= absorbed;
+      c.invuln = 0.6;
+      c.hurt = 1;
+      this.audio.play('guardianBeam');
+      const pl = this.player;
+      for (let i = 0; i < 16; i++) {
+        const a = Math.random() * TAU;
+        const sp = 14 + Math.random() * 46;
+        this.spawn({
+          type: 'spark',
+          x: pl.x,
+          y: pl.y - 12,
+          vx: Math.cos(a) * sp,
+          vy: Math.sin(a) * sp * 0.7,
+          size: 1,
+          color: i % 2 ? '#9fe8ff' : '#ffffff',
+          max: 0.35 + Math.random() * 0.35,
+          drag: 0.93,
+        });
+      }
+      if (amount <= 0.01) return true;
+    }
     c.hp = Math.max(0, c.hp - amount);
     this.lifeHP = c.hp;
     c.invuln = 0.9;
@@ -2767,10 +2965,15 @@ export class Game {
     return groundAt(L, boss.x) - 28;
   }
 
-  damageWilds(target, amount, hitX, hitY) {
+  damageWilds(target, amount, hitX, hitY, opts) {
     if (!target || !target.alive) return false;
     const c = this.combat;
     const boss = c && target === c.boss;
+    if (opts && opts.elemental && amount > 0) {
+      amount *= this.powerBonus();
+      this.markFoe(target);
+      if (this.upgradeCount('elec') > 0) this.shockArc(target, amount);
+    }
     target.hp = Math.max(0, target.hp - amount);
     target.flash = 1;
     for (let i = 0; i < 7; i++) {
@@ -4461,18 +4664,39 @@ export class Game {
     }
 
     const frac = clamp(c.hp / c.max, 0, 1);
-    const col = frac > 0.55 ? '#ffcf8e' : frac > 0.28 ? '#ffb066' : '#ff6a5a';
+    const col = healthColor(frac);
     g.save();
-    drawText(g, 'HER', 10, H - 45, { color: '#e2d4c0', scale: 1 });
+    drawText(g, 'HER', 10, H - 54, { color: '#e2d4c0', scale: 1 });
+    // The ward keeps its own bar, set right above her life.
+    if (c.shieldMax > 0) {
+      const sfrac = clamp(c.shield / c.shieldMax, 0, 1);
+      g.fillStyle = 'rgba(8,10,18,0.82)';
+      g.fillRect(9, H - 45, 78, 6);
+      if (sfrac > 0) {
+        g.fillStyle = '#7fd0ff';
+        g.fillRect(10, H - 44, Math.max(1, Math.round(76 * sfrac)), 4);
+        g.fillStyle = 'rgba(255,255,255,0.28)';
+        g.fillRect(10, H - 44, 76, 1);
+      }
+    }
     g.fillStyle = 'rgba(8,5,6,0.8)';
     g.fillRect(9, H - 35, 78, 7);
-    g.fillStyle = col;
-    g.fillRect(10, H - 33, Math.max(0, Math.round(76 * frac)), 3);
-    g.fillStyle = 'rgba(255,255,255,0.22)';
-    g.fillRect(10, H - 33, 76, 1);
-    if (c.hurt > 0.02) {
-      g.fillStyle = `rgba(255,255,255,${0.45 * c.hurt})`;
-      g.fillRect(10, H - 33, 76, 3);
+    // With nothing left the bar stays black: there is no colour in her at all.
+    if (frac > 0) {
+      g.fillStyle = col;
+      g.fillRect(10, H - 33, Math.max(1, Math.round(76 * frac)), 3);
+      g.fillStyle = 'rgba(255,255,255,0.22)';
+      g.fillRect(10, H - 33, 76, 1);
+      if (c.hurt > 0.02) {
+        g.fillStyle = `rgba(255,255,255,${0.45 * c.hurt})`;
+        g.fillRect(10, H - 33, 76, 3);
+      }
+    }
+    const power = this.powerName();
+    if (power) {
+      drawText(g, power, 92, H - 33, {
+        color: '#cfeaff', scale: 1, spacing: 1, shadow: '#000000',
+      });
     }
     const hasFoes = c.dogs.some((dog) => dog.alive)
       || c.spiders.some((spider) => spider.alive)
@@ -4480,9 +4704,11 @@ export class Game {
       || (boss && boss.alive);
     const touch = typeof window !== 'undefined' && !!window.__touchButtons;
     const hint = bossAlive
-      ? (touch
-        ? 'X SHARDS   C BEAM - BOTH TURN TO THE BOSS'
-        : 'W JUMP   SHIFT DASH   X SHARDS   C KNIGHTS\' BEAM')
+      ? (boss.kind === 'dragon' && boss.steamT > 0
+        ? 'STEAM COMING - JUMP IT'
+        : touch
+          ? 'X SHARDS   C BEAM - BOTH TURN TO THE BOSS'
+          : 'W JUMP   SHIFT DASH   X SHARDS   C KNIGHTS\' BEAM')
       : hasFoes
         ? (touch
           ? 'X SHARDS   C KNIGHTS\' BEAM   HOLD DASH TO RUN'
@@ -5282,7 +5508,7 @@ export class Game {
     // her bar
     const hero = battle.hero;
     const heroFrac = clamp(hero.hp / hero.max, 0, 1);
-    const heroCol = heroFrac > 0.55 ? '#8fd0ff' : heroFrac > 0.28 ? '#ffd166' : '#ff6a6a';
+    const heroCol = healthColor(heroFrac);
     drawText(g, 'HER', 12, H - 47, { color: '#cfc6e4', scale: 1 });
     g.fillStyle = 'rgba(4,5,10,0.78)';
     g.fillRect(11, H - 38, 78, 7);

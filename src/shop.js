@@ -7,6 +7,42 @@ import { drawText, wrapText } from './font.js';
 
 export const SHOP_ITEMS = [
   {
+    id: 'shield',
+    name: 'A WARD OF HER OWN',
+    cost: 50,
+    max: 1,
+    color: '#8fd8ff',
+    desc: 'A SHIELD BAR SITS ABOVE HER LIFE AND TAKES THE FIRST BLOW OF EVERY ROAD. IT COMES BACK WHOLE AT EACH STAGE.',
+    bought: 'THE AIR CLOSES AROUND HER SHOULDERS.',
+  },
+  {
+    id: 'fire',
+    name: 'FIRE IN HER X',
+    cost: 50,
+    max: 1,
+    color: '#ff7a3c',
+    desc: 'HER X SHARDS BITE 15 PERCENT HARDER AND SET THE FOE ALIGHT: 2 PERCENT OF ITS LIFE EVERY SECOND.',
+    bought: 'THE SHARDS LEAVE HER HAND ALREADY BURNING.',
+  },
+  {
+    id: 'ice',
+    name: 'ICE IN HER X',
+    cost: 50,
+    max: 1,
+    color: '#9fd8ff',
+    desc: 'HER X SHARDS BITE 14 PERCENT HARDER, AND THE COLD SLOWS WHATEVER THEY TOUCH.',
+    bought: 'EVERY SHARD LEAVES A RIME WHERE IT LANDS.',
+  },
+  {
+    id: 'elec',
+    name: 'ELECTRIC IN HER X',
+    cost: 50,
+    max: 1,
+    color: '#c9a6ff',
+    desc: 'HER X SHARDS BITE 18 PERCENT HARDER, AND THE CHARGE JUMPS TO ANOTHER FOE CLOSE BY.',
+    bought: 'THE AIR SNAPS AROUND HER FINGERS.',
+  },
+  {
     id: 'warden',
     name: 'AUTOMATIC GUARDIAN',
     cost: 150,
@@ -30,10 +66,10 @@ export function drawShopOverlay(g, game) {
   const s = game.shop;
   if (!s) return;
 
-  const px = 76;
-  const py = 68;
-  const pw = W - 152;
-  const ph = 140;
+  const px = 44;
+  const py = 16;
+  const pw = W - 88;
+  const ph = 238;
 
   g.save();
   g.fillStyle = 'rgba(3,3,8,0.82)';
@@ -47,15 +83,15 @@ export function drawShopOverlay(g, game) {
   g.fillRect(px, py, 1, ph);
   g.fillRect(px + pw - 1, py, 1, ph);
 
-  drawText(g, 'THE SOUL PEDDLER', W / 2, py + 10, {
+  drawText(g, 'THE SOUL PEDDLER', W / 2, py + 8, {
     align: 'center', color: '#efe6f4', scale: 1, spacing: 2, shadow: '#000000',
   });
-  drawText(g, `SOULS  ${game.souls}`, W / 2, py + 22, {
+  drawText(g, `SOULS  ${game.souls}`, W / 2, py + 20, {
     align: 'center', color: '#ffd9a0', scale: 1, spacing: 1,
   });
 
-  const rowH = 24;
-  const top = py + 40;
+  const rowH = 20;
+  const top = py + 36;
   const rows = SHOP_ITEMS.length + 1;
 
   for (let i = 0; i < rows; i++) {
@@ -65,7 +101,7 @@ export function drawShopOverlay(g, game) {
 
     if (sel) {
       g.fillStyle = 'rgba(150,120,190,0.22)';
-      g.fillRect(px + 8, y - 7, pw - 16, rowH - 4);
+      g.fillRect(px + 8, y - 6, pw - 16, rowH - 4);
       // the pixel font has no arrow: draw the marker
       g.fillStyle = '#ffd9a0';
       g.beginPath();
@@ -98,19 +134,24 @@ export function drawShopOverlay(g, game) {
 
   const chosen = SHOP_ITEMS[s.index];
   const desc = chosen ? chosen.desc : 'SHE TAKES HER SOULS WITH HER.';
-  let dy = top + rows * rowH + 2;
+  let dy = top + rows * rowH + 4;
   for (const line of wrapText(desc, pw - 30, 1, 1)) {
     drawText(g, line, W / 2, dy, { align: 'center', color: '#c9c1d6', scale: 1, spacing: 1 });
     dy += 11;
   }
 
+  // The elements are meant to be worn together.
+  drawText(g, 'TWO MIX: HOT MIST / PLASMA / STORM. ALL THREE VAPORIZE.', W / 2, py + ph - 34, {
+    align: 'center', color: '#9fd8d0', scale: 1, spacing: 1,
+  });
+
   if (s.notice) {
-    drawText(g, s.notice.text, W / 2, py + ph - 24, {
+    drawText(g, s.notice.text, W / 2, py + ph - 22, {
       align: 'center', color: s.notice.color, scale: 1, spacing: 1, shadow: '#000000',
     });
   }
 
-  drawText(g, 'A / D  CHOOSE     E  BUY     ESC  CLOSE', W / 2, py + ph - 11, {
+  drawText(g, 'A / D  CHOOSE     E  BUY     ESC  CLOSE', W / 2, py + ph - 10, {
     align: 'center', color: '#8d869f', scale: 1, spacing: 1,
   });
   g.restore();

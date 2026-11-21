@@ -39,8 +39,9 @@ and cannot be walked past.
                            water in two: the dragon rides the water on one
                            side of it, leaps the whole bridge, and lands in
                            the water on the other, never on the planks.
-                           After every second landing a Steam Blast runs the
-                           span and takes a heart.
+                           Every third landing a Steam Blast runs the span
+                           and takes a heart — unless she is in the air:
+                           it rolls low, so a jump clears it.
 
 Shards wear a keeper down; its health bar sits at the top of the screen.
 Both of them are worth a payout from the road's soul purse, and the road
@@ -55,11 +56,25 @@ takes a step: souls in, power out.
   C              buy the chosen ware (souls are spent, not borrowed)
   X              leave the stall and take the road
 
+  A WARD OF HER OWN     50 souls  a shield bar above her hearts. It takes
+                                  the first blow of every road, and comes
+                                  back whole at the start of each stage.
+  FIRE IN HER X         50 souls  shards bite 15 percent harder and set
+                                  the keeper burning: 2 percent a second.
+  ICE IN HER X          50 souls  shards bite 14 percent harder and the
+                                  cold slows whatever they touch.
+  ELECTRIC IN HER X     50 souls  shards bite 18 percent harder and the
+                                  charge jumps to another bot nearby.
   AUTOMATIC GUARDIAN   150 souls  two shadows kill any spider that comes
                                   near her, without a button. Bought once.
   REFILL HER HEALTH     10 souls  her hearts fill to the brim again.
                                   Buy it whenever she is hurt.
   LEAVE THE STALL                 walk on
+
+Any two elements mix (fire + ice = hot mist, fire + electric = plasma,
+ice + electric = storm); all three vaporize, with shock and mist at once.
+Her hearts run purple at full, then blue, green, yellow, orange and red,
+and go black when there is nothing left.
 
 Souls come off the spiders she puts down (the guardian's kills pay too) and
 they never vanish between roads. Each road pays 35 to 80 souls in all, split

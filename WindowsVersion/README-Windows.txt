@@ -1,5 +1,22 @@
-THE LAST JOURNEY — Windows Edition (v2.1.1)
+THE LAST JOURNEY — Windows Edition (v2.2.0)
 ===========================================
+
+WHAT'S NEW IN v2.2.0
+--------------------
+- THE DRAGON'S BRIDGE IS ONE UNBROKEN DECK. The last span runs the whole
+  cut from cliff to cliff, so there is no hole in the planks to fall
+  through mid-fight. The sea is still in two parts, one at each end.
+- THE STEAM BLAST CAN BE JUMPED. Every third landing now, not every
+  second, 9 instead of 13, and it rolls low: jump and it goes under her.
+  A warning line marks the moment it gathers.
+- A WARD FOR HER, 50 souls: a shield bar above her life bar, taking the
+  first blow of every road and coming back at each stage.
+- HER LIFE BAR RUNS PURPLE, BLUE, GREEN, YELLOW, ORANGE, RED — and black
+  and empty when she is gone.
+- FIRE, ICE AND ELECTRIC IN HER X, 50 souls each: +15 percent and burning,
+  +14 percent and slowing, +18 percent and a charge that jumps. Any two
+  mix; all three vaporize with shock and mist.
+- Same release key / save-free install as v2.1.1: version 2.2.0.
 
 WHAT'S NEW IN v2.1.1
 --------------------

@@ -1,5 +1,25 @@
-THE LAST JOURNEY — Android Edition (v2.1.1)
+THE LAST JOURNEY — Android Edition (v2.2.0)
 ============================================
+
+WHAT'S NEW IN v2.2.0
+--------------------
+- THE DRAGON'S BRIDGE IS ONE UNBROKEN DECK. The last span now runs the
+  whole cut from cliff to cliff, so there is no hole in the planks to fall
+  through mid-fight. The sea still runs in two parts, one at either end.
+- THE STEAM BLAST CAN BE JUMPED. It comes every third landing now instead
+  of every second, costs 9 instead of 13, and rolls low along the planks:
+  jump it and it passes underneath. A warning line tells her when it is
+  gathering.
+- A WARD FOR HER, 50 souls. It adds a shield bar above her life bar; it
+  takes the first blow of every road and comes back whole at each stage.
+- HER LIFE BAR HAS A COLOUR SCALE: purple at full, then blue, green,
+  yellow, orange, red — and black and empty when there is nothing left.
+- THREE ELEMENTS IN HER X, 50 souls each. FIRE: 15 percent more shard
+  damage and the foe burns for 2 percent of its life a second. ICE: 14
+  percent more and the cold slows it. ELECTRIC: 18 percent more and the
+  charge jumps to another foe nearby. Any two mix (hot mist, plasma,
+  storm); all three vaporize, with shock and mist together.
+- Same release key: versionName 2.2.0, versionCode 15.
 
 WHAT'S NEW IN v2.1.1
 --------------------

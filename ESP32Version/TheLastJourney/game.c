@@ -103,6 +103,7 @@ typedef struct {
   float x, y, vx;
   int live;
   float life;
+  float dmg;     /* what this shard takes off whatever it hits */
 } Shard;
 
 static Player p;
@@ -120,9 +121,12 @@ static const int BOSS_KIND[3] = { 0, 1, 2 };
 typedef struct {
   int kind;              /* 1 tiger, 2 dragon */
   float x, home, base_y;
-  int hp, max_hp, alive, active, facing;
+  /* damage is paid in fractions now: her X powers bite by percentages */
+  float hp, max_hp;
+  int alive, active, facing;
   float intro, cd, claw_t, pounce_t, pounce_x;
   float hop_t, hop_from, hop_to, lift, steam_t, steam_burst;
+  float burn_t, ice_t, shock_t;
   int hops;
   float flash;
 } Boss;
@@ -138,7 +142,10 @@ static int finished;
 /* ---- the soul peddler -------------------------------------------------- */
 /* Souls are the purse: they come off the bots she puts down, they add up
  * across the run, and the stall at the first of every road spends them. */
-#define SHOP_ROWS 3
+/* Four wares for her body and her X: a ward, and fire, ice and the charge.
+ * The road's own powers still sit behind them. */
+#define SHOP_ROWS 7
+#define SHOP_ITEMS 6
 static int souls;
 static int purse;      /* souls this road will pay in all: 35-80 */
 static int purse_start;/* the purse as it was filled, to spot the lone hundred */
@@ -149,10 +156,21 @@ static int auto_kill;
 static int bots_killed;
 static float shop_t;
 static float zap_t, zap_x, zap_cd;
+/* her ward: one blow taken for her, back at the start of every road */
+static int shield_on, shield_hp;
+/* the peddler's elements: fire burns, ice slows, the charge bites harder */
+static int pw_fire, pw_ice, pw_elec;
 
-static const char *SHOP_NAME[2] = { "AUTOMATIC GUARDIAN", "REFILL HER HEALTH" };
-static const int SHOP_COST[2] = { 150, 10 };
-static const char *SHOP_DESC[2] = {
+static const char *SHOP_NAME[SHOP_ITEMS] = {
+  "A WARD OF HER OWN", "FIRE IN HER X", "ICE IN HER X",
+  "ELECTRIC IN HER X", "AUTOMATIC GUARDIAN", "REFILL HER HEALTH",
+};
+static const int SHOP_COST[SHOP_ITEMS] = { 50, 50, 50, 50, 150, 10 };
+static const char *SHOP_DESC[SHOP_ITEMS] = {
+  "A BAR ABOVE HER LIFE. IT TAKES THE FIRST BLOW.",
+  "SHARDS BITE 15% HARDER AND BURN 2% A SECOND.",
+  "SHARDS BITE 14% HARDER AND SLOW WHAT THEY TOUCH.",
+  "SHARDS BITE 18% HARDER AND THE CHARGE JUMPS.",
   "TWO SHADOWS KILL NEARBY BOTS. NEVER A BOSS.",
   "HER LIFE FILLS TO THE BRIM AGAIN.",
 };
@@ -189,6 +207,23 @@ static void draw_boss(void);
 
 static float clampf(float v, float a, float b) {
   return v < a ? a : (v > b ? b : v);
+}
+
+/* What her X is worth once the peddler's elements are in it. Any two feed
+ * each other; all three vaporize. */
+static int power_count(void) {
+  return (pw_fire ? 1 : 0) + (pw_ice ? 1 : 0) + (pw_elec ? 1 : 0);
+}
+
+static float power_mult(void) {
+  float m = 1.0f;
+  int n = power_count();
+  if (pw_fire) m += 0.15f;
+  if (pw_ice) m += 0.14f;
+  if (pw_elec) m += 0.18f;
+  if (n == 2) m += 0.10f;
+  if (n == 3) m += 0.25f;
+  return m;
 }
 
 static int gi(float x) {
@@ -419,7 +454,7 @@ static void reset_stage(int idx) {
   for (i = 0; i < MAX_SHARDS; i++) shards[i].live = 0;
 
   boss.kind = BOSS_KIND[idx];
-  boss.max_hp = boss.kind ? 9 : 0;
+  boss.max_hp = boss.kind ? 9.0f : 0.0f;
   boss.hp = boss.max_hp;
   boss.alive = boss.kind ? 1 : 0;
   boss.active = 0;
@@ -442,6 +477,11 @@ static void reset_stage(int idx) {
   boss.steam_burst = 0.0f;
   boss.hops = 0;
   boss.flash = 0.0f;
+  boss.burn_t = 0.0f;
+  boss.ice_t = 0.0f;
+  boss.shock_t = 0.0f;
+  /* The ward the peddler sold her is hers for good, and comes back whole. */
+  shield_hp = shield_on ? 1 : 0;
 
   cam = 0;
   /* The peddler is set up where the road begins: the window opens first. */
@@ -458,6 +498,11 @@ void game_init(void) {
   max_hp = 3;
   auto_kill = 0;
   bots_killed = 0;
+  shield_on = 0;
+  shield_hp = 0;
+  pw_fire = 0;
+  pw_ice = 0;
+  pw_elec = 0;
   shop_sel = 0;
   memset(fb, 0, sizeof(fb));
   reset_stage(0);
@@ -471,6 +516,13 @@ static void hurt(int dmg) {
   return;
 #endif
   if (p.invuln > 0 || state != 0) return;
+  if (shield_hp > 0) {
+    shield_hp = 0;
+    p.invuln = 1.2f;
+    p.vy = -70.0f;
+    p.vx = -p.facing * 40.0f;
+    return;
+  }
   p.hp -= dmg;
   p.invuln = 1.2f;
   p.vy = -70.0f;
@@ -494,6 +546,7 @@ static void shoot(void) {
         shards[i].y = p.y - 11.0f;
         shards[i].vx = dir * 250.0f;
         shards[i].life = 1.6f;
+        shards[i].dmg = power_mult();
         shards[i].live = 1;
         break;
       }
@@ -503,8 +556,15 @@ static void shoot(void) {
 }
 
 /* ---- the keepers' rules ------------------------------------------------ */
+/* A keeper's death: paid out of the road's purse, like everything else. */
+static void boss_die(void) {
+  boss.hp = 0.0f;
+  boss.alive = 0;
+  souls += roll_souls();
+}
+
 static void update_boss(float dt) {
-  float ad;
+  float ad, sdt;
   if (!boss.alive) return;
   if (!boss.active) {
     if (p.x > boss.x - 150.0f) boss.active = 1;
@@ -512,6 +572,16 @@ static void update_boss(float dt) {
   }
   if (boss.flash > 0.0f) boss.flash -= dt;
   if (boss.steam_burst > 0.0f) boss.steam_burst -= dt;
+  /* fire keeps eating at it: two percent of everything it has, every second */
+  if (boss.burn_t > 0.0f) {
+    boss.burn_t -= dt;
+    boss.hp -= boss.max_hp * 0.02f * dt;
+    if (boss.hp <= 0.0f) { boss_die(); return; }
+  }
+  if (boss.ice_t > 0.0f) boss.ice_t -= dt;
+  if (boss.shock_t > 0.0f) boss.shock_t -= dt;
+  /* frost in its blood: everything it does comes slower */
+  sdt = boss.ice_t > 0.0f ? dt * 0.55f : dt;
   boss.base_y = (boss.kind == 2 && has_bridge) ? sea_y : ground_y(boss.x);
   if (boss.intro > 0.0f) { boss.intro -= dt; return; }
   boss.facing = (p.x < boss.x) ? -1 : 1;
@@ -520,13 +590,13 @@ static void update_boss(float dt) {
   if (boss.kind == 1) {
     /* the tiger: closes the gap on two legs, swipes, and leaps at her mark */
     if (boss.claw_t > 0.0f) {
-      boss.claw_t -= dt;
+      boss.claw_t -= sdt;
       if (boss.claw_t <= 0.0f && ad < 40.0f) hurt(1);
       return;
     }
     if (boss.pounce_t > 0.0f) {
-      boss.pounce_t -= dt;
-      boss.x += (boss.pounce_x - boss.x) * clampf(dt * 6.0f, 0.0f, 1.0f);
+      boss.pounce_t -= sdt;
+      boss.x += (boss.pounce_x - boss.x) * clampf(sdt * 6.0f, 0.0f, 1.0f);
       boss.lift = sinf((1.0f - boss.pounce_t / 0.5f) * 3.14159f) * 14.0f;
       if (boss.pounce_t <= 0.0f) {
         boss.lift = 0.0f;
@@ -536,8 +606,8 @@ static void update_boss(float dt) {
       return;
     }
     boss.lift = 0.0f;
-    if (ad > 44.0f) boss.x += (p.x > boss.x ? 1.0f : -1.0f) * (ad > 120.0f ? 72.0f : 34.0f) * dt;
-    boss.cd -= dt;
+    if (ad > 44.0f) boss.x += (p.x > boss.x ? 1.0f : -1.0f) * (ad > 120.0f ? 72.0f : 34.0f) * sdt;
+    boss.cd -= sdt;
     if (boss.cd <= 0.0f) {
       if (ad < 62.0f) boss.claw_t = 0.4f;
       else { boss.pounce_t = 0.5f; boss.pounce_x = p.x; }
@@ -547,34 +617,37 @@ static void update_boss(float dt) {
     /* the water dragon: leaps from the sea on one side of the bridge into the
      * sea on the other, and every second landing breathes */
     if (boss.steam_t > 0.0f) {
-      boss.steam_t -= dt;
+      boss.steam_t -= sdt;
       if (boss.steam_t <= 0.0f) {
         boss.steam_burst = 0.5f;
-        /* it runs the whole span: neither end of the bridge is safe */
-        if (has_bridge) {
-          if (p.x > bridge_x0 - 20.0f && p.x < bridge_x1 + 20.0f) hurt(1);
-        } else if (ad < 170.0f) {
-          hurt(1);
+        /* It runs the whole span, so neither end of the bridge is safe. It
+         * rolls low along the planks, though: a jump clears it. */
+        if (p.on_ground) {
+          if (has_bridge) {
+            if (p.x > bridge_x0 - 20.0f && p.x < bridge_x1 + 20.0f) hurt(1);
+          } else if (ad < 170.0f) {
+            hurt(1);
+          }
         }
       }
       return;
     }
     if (boss.hop_t > 0.0f) {
       float k;
-      boss.hop_t -= dt;
+      boss.hop_t -= sdt;
       k = 1.0f - boss.hop_t / 0.9f;
       boss.x = boss.hop_from + (boss.hop_to - boss.hop_from) * k;
       boss.lift = sinf(k * 3.14159f) * 34.0f;
       if (boss.hop_t <= 0.0f) {
         boss.lift = 0.0f;
         boss.hops++;
-        if (boss.hops % 2 == 0) boss.steam_t = 0.7f;
+        if (boss.hops % 3 == 0) boss.steam_t = 0.85f;
         boss.cd = 0.8f;
       }
       return;
     }
     boss.lift = 0.0f;
-    boss.cd -= dt;
+    boss.cd -= sdt;
     if (boss.cd <= 0.0f) {
       boss.hop_from = boss.x;
       boss.hop_to = (boss.x < boss.home) ? boss.home + 132.0f : boss.home - 132.0f;
@@ -600,16 +673,28 @@ static void update_shop(int left_pressed, int right_pressed, int jump_pressed, i
   if (jump_pressed) { leave_shop(); return; }
   if (!action_pressed) return;
 
-  if (shop_sel >= 2) { leave_shop(); return; }
+  if (shop_sel >= SHOP_ITEMS) { leave_shop(); return; }
   if (shop_sel == 0) {
-    if (!auto_kill && souls >= SHOP_COST[0]) {
+    if (!shield_on && souls >= SHOP_COST[0]) {
       souls -= SHOP_COST[0];
+      shield_on = 1;
+      shield_hp = 1;
+    }
+  } else if (shop_sel == 1) {
+    if (!pw_fire && souls >= SHOP_COST[1]) { souls -= SHOP_COST[1]; pw_fire = 1; }
+  } else if (shop_sel == 2) {
+    if (!pw_ice && souls >= SHOP_COST[2]) { souls -= SHOP_COST[2]; pw_ice = 1; }
+  } else if (shop_sel == 3) {
+    if (!pw_elec && souls >= SHOP_COST[3]) { souls -= SHOP_COST[3]; pw_elec = 1; }
+  } else if (shop_sel == 4) {
+    if (!auto_kill && souls >= SHOP_COST[4]) {
+      souls -= SHOP_COST[4];
       auto_kill = 1;
       bots_killed = 0;
     }
-  } else if (shop_sel == 1) {
-    if (p.hp < max_hp && souls >= SHOP_COST[1]) {
-      souls -= SHOP_COST[1];
+  } else if (shop_sel == 5) {
+    if (p.hp < max_hp && souls >= SHOP_COST[5]) {
+      souls -= SHOP_COST[5];
       p.hp = max_hp;
     }
   }
@@ -731,13 +816,12 @@ static void update_play(float dt, GameInput in, int jump_pressed, int action_pre
         if (!shards[i].live) continue;
         if (fabsf(shards[i].x - boss.x) < 24.0f && fabsf(shards[i].y - bhit_y) < 30.0f) {
           shards[i].live = 0;
-          boss.hp--;
+          boss.hp -= shards[i].dmg;
           boss.flash = 0.12f;
-          if (boss.hp <= 0) {
-            boss.hp = 0;
-            boss.alive = 0;
-            souls += roll_souls();
-          }
+          if (pw_fire) boss.burn_t = 4.0f;
+          if (pw_ice) boss.ice_t = 3.2f;
+          if (pw_elec) boss.shock_t = 1.4f;
+          if (boss.hp <= 0.0f) boss_die();
         }
       }
     }
@@ -932,12 +1016,30 @@ static void draw_boss(void) {
   if (boss.flash > 0.0f) rect(bx - 18, by - 46, 36, 46, to565(0xFFFFFF));
 }
 
+/* Her life runs purple at full, then blue, green, yellow, orange and red.
+ * At nothing there is no colour left: the pips go black. */
+static uint16_t hp_colour(float frac) {
+  if (frac <= 0.001f) return to565(0x050505);
+  if (frac >= 0.999f) return to565(0xB06CFF);
+  if (frac > 0.75f) return to565(0x4F8DFF);
+  if (frac > 0.5f) return to565(0x4FD06A);
+  if (frac > 0.3f) return to565(0xFFD84F);
+  if (frac > 0.15f) return to565(0xFF9838);
+  return to565(0xFF4A3C);
+}
+
 static void draw_hud(void) {
   char buf[16];
   int i;
+  float hfrac = max_hp > 0 ? (float)p.hp / (float)max_hp : 0.0f;
+  uint16_t hcol = hp_colour(hfrac);
+
+  /* her ward: its own bar, set above her life */
+  rect(6, 1, 44, 3, to565(0x101018));
+  if (shield_on && shield_hp > 0) rect(7, 2, 42, 1, to565(0x7FD0FF));
 
   for (i = 0; i < max_hp && i < 5; i++) {
-    uint16_t c = i < p.hp ? to565(0xE05050) : to565(0x402028);
+    uint16_t c = i < p.hp ? hcol : to565(0x141414);
     int hx = 6 + i * 7;
     px(hx, 6, c);
     px(hx + 1, 5, c);
@@ -969,6 +1071,10 @@ static void draw_hud(void) {
   buf[6] = (char)('0' + mem_n);
   buf[7] = 0;
   text(buf, W - 6 - text_w(buf, 1), 13, 1, to565(0x9FB4C4));
+
+  if (boss.alive && boss.active && boss.kind == 2 && boss.steam_t > 0.0f) {
+    text_center("STEAM COMING - JUMP IT", H - 12, 1, to565(0xFFE0A0));
+  }
 
   if (banner > 0.0f) {
     text_center(STAGES[stage_i].name, 56, 1, to565(0xF0ECDC));
@@ -1027,57 +1133,61 @@ static void draw_shop(void) {
     }
   }
 
-  rect(38, 22, W - 76, H - 44, to565(0x161220));
-  rect(38, 22, W - 76, 1, to565(0x8E7FB0));
-  rect(38, H - 23, W - 76, 1, to565(0x8E7FB0));
-  rect(38, 22, 1, H - 44, to565(0x8E7FB0));
-  rect(W - 39, 22, 1, H - 44, to565(0x8E7FB0));
+  rect(24, 8, W - 48, H - 16, to565(0x161220));
+  rect(24, 8, W - 48, 1, to565(0x8E7FB0));
+  rect(24, H - 9, W - 48, 1, to565(0x8E7FB0));
+  rect(24, 8, 1, H - 16, to565(0x8E7FB0));
+  rect(W - 25, 8, 1, H - 16, to565(0x8E7FB0));
 
-  text_center("THE SOUL PEDDLER", 30, 1, to565(0xF0E8F8));
+  text_center("THE SOUL PEDDLER", 14, 1, to565(0xF0E8F8));
   mem_str(buf, souls);
-  text(buf, W - 44 - text_w(buf, 1), 40, 1, to565(0xD8C9A8));
+  text(buf, W - 30 - text_w(buf, 1), 24, 1, to565(0xD8C9A8));
 
   for (i = 0; i < SHOP_ROWS; i++) {
     int owned = 0;
     const char *label;
-    y = 56 + i * 18;
+    y = 36 + i * 15;
     if (i == shop_sel) {
-      rect(46, y - 3, W - 92, 13, to565(0x2A2140));
-      px(48, y + 1, to565(0xFFD9A0));
-      px(48, y + 2, to565(0xFFD9A0));
-      px(49, y + 2, to565(0xFFD9A0));
-      px(48, y + 3, to565(0xFFD9A0));
+      rect(28, y - 3, W - 56, 11, to565(0x2A2140));
+      px(30, y + 1, to565(0xFFD9A0));
+      px(30, y + 2, to565(0xFFD9A0));
+      px(31, y + 2, to565(0xFFD9A0));
+      px(30, y + 3, to565(0xFFD9A0));
     }
-    if (i == 2) {
-      text("LEAVE THE STALL", 56, y, 1, shop_sel == 2 ? to565(0xFFFFFF) : to565(0xB9B2C8));
-      text("WALK ON", W - 84, y, 1, to565(0x8A8296));
+    if (i == SHOP_ITEMS) {
+      text("LEAVE THE STALL", 38, y, 1, shop_sel == i ? to565(0xFFFFFF) : to565(0xB9B2C8));
+      text("WALK ON", W - 60, y, 1, to565(0x8A8296));
       continue;
     }
     label = SHOP_NAME[i];
-    if (i == 0) owned = auto_kill;
+    if (i == 0) owned = shield_on;
+    else if (i == 1) owned = pw_fire;
+    else if (i == 2) owned = pw_ice;
+    else if (i == 3) owned = pw_elec;
+    else if (i == 4) owned = auto_kill;
     else owned = (p.hp >= max_hp) ? 2 : 0;
 
     if (owned == 1) {
-      text(label, 56, y, 1, to565(0x6B6478));
-      text("OWNED", W - 84, y, 1, to565(0x6B6478));
+      text(label, 38, y, 1, to565(0x6B6478));
+      text("OWNED", W - 60, y, 1, to565(0x6B6478));
       continue;
     }
     if (owned == 2) {
-      text(label, 56, y, 1, to565(0x6B6478));
-      text("WHOLE", W - 84, y, 1, to565(0x6B6478));
+      text(label, 38, y, 1, to565(0x6B6478));
+      text("WHOLE", W - 60, y, 1, to565(0x6B6478));
       continue;
     }
-    text(label, 56, y, 1, souls >= SHOP_COST[i] ? to565(0xF6E2C0) : to565(0x8A8296));
+    text(label, 38, y, 1, souls >= SHOP_COST[i] ? to565(0xF6E2C0) : to565(0x8A8296));
     cost_str(buf, SHOP_COST[i]);
-    text(buf, W - 44 - text_w(buf, 1), y, 1,
+    text(buf, W - 30 - text_w(buf, 1), y, 1,
          souls >= SHOP_COST[i] ? to565(0xFFD9A0) : to565(0x8A8296));
   }
 
-  if (shop_sel < 2) text_center(SHOP_DESC[shop_sel], 118, 1, to565(0xC9C1D6));
-  else text_center("SHE TAKES HER SOULS WITH HER.", 118, 1, to565(0xC9C1D6));
+  if (shop_sel < SHOP_ITEMS) text_center(SHOP_DESC[shop_sel], 142, 1, to565(0xC9C1D6));
+  else text_center("SHE TAKES HER SOULS WITH HER.", 142, 1, to565(0xC9C1D6));
 
   if (shop_t > 0.25f) {
-    text_center("LEFT RIGHT CHOOSE   C BUY   X GO", H - 34, 1, to565(0x8D869F));
+    text_center("LEFT RIGHT CHOOSE   C BUY   X GO", H - 12, 1, to565(0x8D869F));
   }
 }
 
@@ -1134,7 +1244,10 @@ int game_stamina(void) { return (int)p.stamina; }
 int game_max_hp(void) { return max_hp; }
 int game_auto_kill(void) { return auto_kill; }
 int game_boss_kind(void) { return boss.kind; }
-int game_boss_hp(void) { return boss.hp; }
+int game_boss_hp(void) { return (int)(boss.hp + 0.5f); }
+int game_shield(void) { return shield_hp; }
+int game_shield_owned(void) { return shield_on; }
+int game_powers(void) { return power_count(); }
 int game_bots_killed(void) { return bots_killed; }
 
 #ifdef GAME_TEST
