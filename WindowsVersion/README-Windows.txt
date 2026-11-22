@@ -1,5 +1,16 @@
-THE LAST JOURNEY — Windows Edition (v2.2.0)
+THE LAST JOURNEY — Windows Edition (v2.2.1)
 ===========================================
+
+WHAT'S NEW IN v2.2.1
+--------------------
+- THE LAST BRIDGE NOW CROSSES A CUT. The sea waits at either end of the
+  span and the middle is open air, so the planks read as a bridge again
+  instead of a jetty laid across flat water. The dragon still rides the
+  water at both ends and never stands on the deck.
+- THE WARD BAR IS HERS ALONE. Her shield bar no longer appears until the
+  peddler has sold her the ward; before that there is only her life bar.
+- THE SHOP'S PERCENT TEXT READS CORRECTLY, and the peddler's window fits
+  every line.
 
 WHAT'S NEW IN v2.2.0
 --------------------
@@ -16,7 +27,7 @@ WHAT'S NEW IN v2.2.0
 - FIRE, ICE AND ELECTRIC IN HER X, 50 souls each: +15 percent and burning,
   +14 percent and slowing, +18 percent and a charge that jumps. Any two
   mix; all three vaporize with shock and mist.
-- Same release key / save-free install as v2.1.1: version 2.2.0.
+- Same release key / save-free install as v2.1.1: version 2.2.1.
 
 WHAT'S NEW IN v2.1.1
 --------------------

@@ -262,7 +262,7 @@ static void disc(int cx, int cy, int r, uint16_t c) {
 }
 
 /* ---- 3x5 font ---------------------------------------------------------- */
-static const char *FONT[40] = {
+static const char *FONT[41] = {
   "111101111101101", /* A */
   "110101110101110", /* B */
   "111100100100111", /* C */
@@ -303,6 +303,7 @@ static const char *FONT[40] = {
   "000010000010000", /* : */
   "000000000000010", /* . */
   "010010010000010", /* ! */
+  "110001010100011", /* % */
 };
 
 static int glyph(char c) {
@@ -312,6 +313,7 @@ static int glyph(char c) {
   if (c == ':') return 37;
   if (c == '.') return 38;
   if (c == '!') return 39;
+  if (c == '%') return 40;
   return -1;
 }
 
@@ -878,11 +880,22 @@ static void draw_world(void) {
   }
 
   if (has_bridge) {
-    /* the sea either side of the bridge, and the plank span between them */
+    /* The span crosses one cut: dark air under the planks, and the sea
+     * waiting at either end of the bridge, never a lake beneath it. */
     int bx0 = (int)(bridge_x0 - cam);
     int bx1 = (int)(bridge_x1 - cam);
     int wy = (int)sea_y;
     for (x = bx0 - (int)SEA_W; x < bx1 + (int)SEA_W; x++) {
+      if (x < 0 || x >= W) continue;
+      rect(x, wy, 1, H - wy, to565(0x08141A));
+    }
+    for (x = bx0 - (int)SEA_W; x < bx0; x++) {
+      if (x < 0 || x >= W) continue;
+      rect(x, wy, 1, H - wy, to565(0x10343C));
+      px(x, wy, ((x >> 1) & 1) ? to565(0x8FC9BF) : to565(0x2E6A68));
+      if ((x % 9) == 0) px(x, wy + 4, to565(0x1D5A60));
+    }
+    for (x = bx1; x < bx1 + (int)SEA_W; x++) {
       if (x < 0 || x >= W) continue;
       rect(x, wy, 1, H - wy, to565(0x10343C));
       px(x, wy, ((x >> 1) & 1) ? to565(0x8FC9BF) : to565(0x2E6A68));
@@ -1034,9 +1047,11 @@ static void draw_hud(void) {
   float hfrac = max_hp > 0 ? (float)p.hp / (float)max_hp : 0.0f;
   uint16_t hcol = hp_colour(hfrac);
 
-  /* her ward: its own bar, set above her life */
-  rect(6, 1, 44, 3, to565(0x101018));
-  if (shield_on && shield_hp > 0) rect(7, 2, 42, 1, to565(0x7FD0FF));
+  /* her ward: its own bar, set above her life, and only once she owns it */
+  if (shield_on) {
+    rect(6, 1, 44, 3, to565(0x101018));
+    if (shield_hp > 0) rect(7, 2, 42, 1, to565(0x7FD0FF));
+  }
 
   for (i = 0; i < max_hp && i < 5; i++) {
     uint16_t c = i < p.hp ? hcol : to565(0x141414);

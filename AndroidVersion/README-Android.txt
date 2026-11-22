@@ -1,5 +1,16 @@
-THE LAST JOURNEY — Android Edition (v2.2.0)
+THE LAST JOURNEY — Android Edition (v2.2.1)
 ============================================
+
+WHAT'S NEW IN v2.2.1
+--------------------
+- THE LAST BRIDGE NOW CROSSES A CUT. The sea waits at either end of the
+  span and the middle is open air, so the planks read as a bridge again
+  instead of a jetty laid across flat water. The dragon still rides the
+  water at both ends and never stands on the deck.
+- THE WARD BAR IS HERS ALONE. Her shield bar no longer appears until the
+  peddler has sold her the ward; before that there is only her life bar.
+- THE SHOP'S PERCENT TEXT READS CORRECTLY, and the peddler's window fits
+  every line.
 
 WHAT'S NEW IN v2.2.0
 --------------------
@@ -19,7 +30,7 @@ WHAT'S NEW IN v2.2.0
   percent more and the cold slows it. ELECTRIC: 18 percent more and the
   charge jumps to another foe nearby. Any two mix (hot mist, plasma,
   storm); all three vaporize, with shock and mist together.
-- Same release key: versionName 2.2.0, versionCode 15.
+- Same release key: versionName 2.2.1, versionCode 16.
 
 WHAT'S NEW IN v2.1.1
 --------------------

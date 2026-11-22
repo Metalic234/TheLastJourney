@@ -24,6 +24,8 @@ const DASH_COOLDOWN = 0.75;
 const SHIELD_MAX = 26;
 // How fast an ice-marked foe still moves.
 const foeSpeed = (foe) => (foe && foe.ice > 0 ? 0.55 : 1);
+// The peddler's three X powers, and how much harder each one bites.
+const POWER_BITE = { fire: 0.15, ice: 0.14, elec: 0.18 };
 
 // Her bar runs purple at full, then down through blue, green, yellow and
 // orange to red. At nothing there is no colour left at all: it is black.
@@ -858,62 +860,75 @@ export class Game {
   // ---- the peddler's elements -------------------------------------------
   // Each of the three X powers is hers for good once bought. Any two of them
   // feed each other, and all three turn her shards into vapour and shock.
+  elementPowers() {
+    return ['fire', 'ice', 'elec'].filter((id) => this.upgradeCount(id) > 0);
+  }
+
   powerCount() {
-    return ['fire', 'ice', 'elec'].filter((id) => this.upgradeCount(id) > 0).length;
+    return this.elementPowers().length;
   }
 
   powerBonus() {
-    let mult = 1;
-    if (this.upgradeCount('fire') > 0) mult += 0.15;
-    if (this.upgradeCount('ice') > 0) mult += 0.14;
-    if (this.upgradeCount('elec') > 0) mult += 0.18;
-    const n = this.powerCount();
-    if (n === 2) mult += 0.1;
-    if (n === 3) mult += 0.25;
-    return mult;
+    const powers = this.elementPowers();
+    const bite = powers.reduce((sum, id) => sum + (POWER_BITE[id] || 0), 0);
+    // Any two feed each other, and all three are worse than the sum.
+    const mix = powers.length === 3 ? 0.25 : powers.length === 2 ? 0.1 : 0;
+    return 1 + bite + mix;
   }
 
   powerName() {
-    const n = this.powerCount();
-    if (n === 0) return '';
-    if (n === 3) return 'VAPOUR AND SHOCK';
-    if (n === 2) {
-      const fire = this.upgradeCount('fire') > 0;
-      const ice = this.upgradeCount('ice') > 0;
-      if (fire && ice) return 'HOT MIST';
-      if (fire) return 'PLASMA';
-      if (ice) return 'STORM';
-      return 'CHARGED AIR';
+    const powers = this.elementPowers();
+    if (powers.length === 3) return 'VAPOUR AND SHOCK';
+    if (powers.length === 2) {
+      if (powers.includes('fire') && powers.includes('ice')) return 'HOT MIST';
+      return powers.includes('fire') ? 'PLASMA' : 'STORM';
     }
-    return this.upgradeCount('fire') > 0 ? 'FIRE'
-      : this.upgradeCount('ice') > 0 ? 'ICE' : 'ELECTRIC';
+    if (powers[0] === 'fire') return 'FIRE';
+    if (powers[0] === 'ice') return 'ICE';
+    return powers.length ? 'ELECTRIC' : '';
+  }
+
+  // Every foe the elements can settle on: everything alive, and the boss.
+  wildsFoes() {
+    const c = this.combat;
+    if (!c) return [];
+    const foes = [];
+    for (const dog of c.dogs) if (dog.alive) foes.push(dog);
+    for (const spider of c.spiders) if (spider.alive) foes.push(spider);
+    for (const crab of c.crabs) if (crab.alive) foes.push(crab);
+    if (c.boss && c.boss.active && c.boss.alive) foes.push(c.boss);
+    return foes;
+  }
+
+  // Where a spark should sit on a foe: the boss has a shape of its own.
+  foeAimY(foe) {
+    return foe === this.combat.boss
+      ? this.bossAimY(foe)
+      : groundAt(this.level, foe.x) - 12;
   }
 
   // What a shard leaves on the thing it hits: fire burns, ice slows, the
   // charge clings and jumps.
   markFoe(foe) {
     if (!foe) return;
-    if (this.upgradeCount('fire') > 0) foe.burn = 4;
-    if (this.upgradeCount('ice') > 0) foe.ice = 3.2;
-    if (this.upgradeCount('elec') > 0) foe.shock = 1.4;
+    const powers = this.elementPowers();
+    if (powers.includes('fire')) foe.burn = 4;
+    if (powers.includes('ice')) foe.ice = 3.2;
+    if (powers.includes('elec')) foe.shock = 1.4;
   }
 
   // The charge jumps to whatever stands near, and the mist comes off it.
   shockArc(foe, amount) {
     const c = this.combat;
     if (!c || !foe) return;
-    const foes = [];
-    for (const dog of c.dogs) if (dog.alive && dog !== foe) foes.push(dog);
-    for (const spider of c.spiders) if (spider.alive && spider !== foe) foes.push(spider);
-    for (const crab of c.crabs) if (crab.alive && crab !== foe) foes.push(crab);
-    if (c.boss && c.boss.active && c.boss.alive && c.boss !== foe) foes.push(c.boss);
+    const foes = this.wildsFoes().filter((other) => other !== foe);
     foes.sort((a, b) => Math.abs(a.x - foe.x) - Math.abs(b.x - foe.x));
     const reach = this.powerCount() >= 3 ? 2 : 1;
-    const fy = foe === c.boss ? this.bossAimY(foe) : groundAt(this.level, foe.x) - 12;
+    const fy = this.foeAimY(foe);
     for (let i = 0; i < Math.min(reach, foes.length); i++) {
       const other = foes[i];
       if (Math.abs(other.x - foe.x) > 150) continue;
-      const oy = other === c.boss ? this.bossAimY(other) : groundAt(this.level, other.x) - 12;
+      const oy = this.foeAimY(other);
       for (let k = 0; k < 8; k++) {
         const t = k / 7;
         this.spawn({
@@ -936,14 +951,8 @@ export class Game {
   tickElements(dt) {
     const c = this.combat;
     if (!c) return;
-    const L = this.level;
-    const foes = [];
-    for (const dog of c.dogs) if (dog.alive) foes.push(dog);
-    for (const spider of c.spiders) if (spider.alive) foes.push(spider);
-    for (const crab of c.crabs) if (crab.alive) foes.push(crab);
-    if (c.boss && c.boss.active && c.boss.alive) foes.push(c.boss);
-    for (const foe of foes) {
-      const y = foe === c.boss ? this.bossAimY(foe) : groundAt(L, foe.x) - 12;
+    for (const foe of this.wildsFoes()) {
+      const y = this.foeAimY(foe);
       if (foe.burn > 0) {
         foe.burn = Math.max(0, foe.burn - dt);
         // Two percent of everything it has, every second.
@@ -2680,7 +2689,8 @@ export class Game {
         // The blast runs the whole span, so the ends of the bridge save
         // nobody. It rolls low along the planks, though: a jump carries her
         // over it while it passes underneath.
-        const airborne = !p.onGround && p.y < groundAt(L, p.x) - 8;
+        const deckY = bridge ? bridge.y : groundAt(L, p.x);
+        const airborne = !p.onGround && p.y < deckY - 8;
         if (!airborne && p.x > L.boss.arenaMin - 40 && p.x < L.boss.arenaMax + 40) {
           this.hurtWilds(9, b.x);
         }
@@ -4667,8 +4677,9 @@ export class Game {
     const col = healthColor(frac);
     g.save();
     drawText(g, 'HER', 10, H - 54, { color: '#e2d4c0', scale: 1 });
-    // The ward keeps its own bar, set right above her life.
-    if (c.shieldMax > 0) {
+    // The ward keeps its own bar, set right above her life: it is there only
+    // once the peddler has sold it to her.
+    if (this.upgradeCount('shield') > 0) {
       const sfrac = clamp(c.shield / c.shieldMax, 0, 1);
       g.fillStyle = 'rgba(8,10,18,0.82)';
       g.fillRect(9, H - 45, 78, 6);

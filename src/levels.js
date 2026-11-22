@@ -976,15 +976,12 @@ function paintCliffs(level, g, rng) {
     treeSilhouette(g, x, gy, rand(rng, 14, 24), 'rgba(22,48,33,0.76)', rng, 0.85);
   }
 
-  // the sea runs under the last bridge and out past both of its ends: one
-  // cold body of water that the span cuts in two
-  if (level.seas && level.seas.length) {
-    const firstSea = level.seas[0];
-    const lastSea = level.seas[level.seas.length - 1];
-    const seaX0 = firstSea.x;
-    const seaX1 = lastSea.x + lastSea.w;
-    const top = Math.round(firstSea.surface);
-    for (let x = seaX0; x < seaX1; x++) {
+  // The water waits at either end of the last bridge and the span crosses the
+  // cut between it: two bodies of sea, not one lake under the planks. The
+  // dragon rides those two ends and never the deck.
+  for (const sea of level.seas || []) {
+    const top = Math.round(sea.surface);
+    for (let x = sea.x; x < sea.x + sea.w; x++) {
       for (let y = top; y < H; y++) {
         const t = (y - top) / Math.max(1, H - top);
         g.fillStyle = mix('#2b6b69', '#041014', clamp(t * 1.15, 0, 1));
@@ -1003,7 +1000,7 @@ function paintCliffs(level, g, rng) {
           g.fillRect(x, top + 6 + k * 11 + wv, 1, 1);
         }
       }
-      const lip = (x < seaX0 + 6) || (x > seaX1 - 7);
+      const lip = (x < sea.x + 6) || (x > sea.x + sea.w - 7);
       if (lip) {
         g.fillStyle = 'rgba(226,248,244,0.32)';
         g.fillRect(x, top + Math.round(Math.sin(x * 0.6)), 1, 2 + (x % 3));
@@ -1014,6 +1011,13 @@ function paintCliffs(level, g, rng) {
   // the bridges: old planks, rope rails, and a little moss
   for (const b of level.bridges) {
     const y = b.y - 2;
+    // stone footings where the deck leaves the cliff, so the span reads as a
+    // bridge over the cut rather than a line laid across the water
+    for (const ex of [b.x - 3, b.x + b.w - 3]) {
+      rect(g, ex, y, 6, 18, '#3c4a3c');
+      rect(g, ex, y, 6, 1, '#8f9f74');
+      rect(g, ex + 1, y + 5, 4, 1, '#2b352b');
+    }
     // posts dropping into the cut
     for (const px of [b.x + 8, b.x + b.w - 12, b.x + Math.round(b.w * 0.5)]) {
       rect(g, px, y, 2, H - y, '#253b2e');

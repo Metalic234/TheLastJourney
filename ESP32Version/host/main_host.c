@@ -67,6 +67,7 @@ int main(int argc, char **argv) {
           printf("shop at stage %d frame %d souls %d hp %d/%d\n",
                  game_stage(), f, game_souls(), game_hp(), game_max_hp());
         }
+        if (shop_frames == 4) write_ppm(dir, 9998); /* the FIRE line, with % */
         if (shop_frames == 3 || shop_frames == 5) in.right = 1;
         if (shop_frames == 7) in.jump = 1;   /* leave the stall */
       } else if (shop_visits == 2) {
