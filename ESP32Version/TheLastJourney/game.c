@@ -375,17 +375,25 @@ static void reset_stage(int idx) {
   arena_y = 0.0f;
   sea_y = 0.0f;
   if (has_bridge) {
-    int bx;
-    /* The span is level and the sea comes up just under its planks, so the
-     * bridge cuts the water in two. Both lips are shallow enough to wade. */
+    int bx, j;
+    /* The span is level, the waterline rides 14px under its planks, and each
+     * bay keeps a shallow rock shelf at both banks that falls away into the
+     * open water, so she can wade in and still climb up to the planks. */
     arena_y = ground_y((bridge_x0 + bridge_x1) * 0.5f);
-    sea_y = arena_y + 2.0f;
+    sea_y = arena_y + 12.0f;
     for (bx = (int)bridge_x0; bx <= (int)bridge_x1; bx++)
       gnd[gi((float)bx)] = (int16_t)arena_y;
-    for (bx = (int)(bridge_x0 - SEA_W); bx < (int)bridge_x0; bx++)
-      if (bx >= 0 && bx < gnd_n) gnd[gi((float)bx)] = (int16_t)(arena_y + 8.0f);
-    for (bx = (int)bridge_x1 + 1; bx <= (int)(bridge_x1 + SEA_W); bx++)
-      if (bx >= 0 && bx < gnd_n) gnd[gi((float)bx)] = (int16_t)(arena_y + 8.0f);
+    for (j = 0; j < 2; j++) {
+      int start = j ? (int)bridge_x1 + 1 : (int)(bridge_x0 - SEA_W);
+      for (bx = 0; bx < (int)SEA_W; bx++) {
+        int xw = start + bx;
+        int edge = bx < (int)SEA_W - 1 - bx ? bx : (int)SEA_W - 1 - bx;
+        float k = edge / 10.0f;
+        if (k > 1.0f) k = 1.0f;
+        if (xw >= 0 && xw < gnd_n)
+          gnd[gi((float)xw)] = (int16_t)(arena_y + 2.0f + 20.0f * k);
+      }
+    }
   }
 
   col_hill_far = to565(cfg->hill_far);
@@ -880,33 +888,42 @@ static void draw_world(void) {
   }
 
   if (has_bridge) {
-    /* The span crosses one cut: dark air under the planks, and the sea
-     * waiting at either end of the bridge, never a lake beneath it. */
+    /* The span rides over one cut: dark air under the planks, and the sea
+     * lying well below the deck at either end of the bridge. Each bay keeps
+     * a rocky shelf at both banks and open water between them. */
     int bx0 = (int)(bridge_x0 - cam);
     int bx1 = (int)(bridge_x1 - cam);
+    int deck = (int)arena_y;
     int wy = (int)sea_y;
+    int j;
     for (x = bx0 - (int)SEA_W; x < bx1 + (int)SEA_W; x++) {
       if (x < 0 || x >= W) continue;
-      rect(x, wy, 1, H - wy, to565(0x08141A));
+      rect(x, deck + 4, 1, H - deck - 4, to565(0x08141A));
     }
-    for (x = bx0 - (int)SEA_W; x < bx0; x++) {
-      if (x < 0 || x >= W) continue;
-      rect(x, wy, 1, H - wy, to565(0x10343C));
-      px(x, wy, ((x >> 1) & 1) ? to565(0x8FC9BF) : to565(0x2E6A68));
-      if ((x % 9) == 0) px(x, wy + 4, to565(0x1D5A60));
-    }
-    for (x = bx1; x < bx1 + (int)SEA_W; x++) {
-      if (x < 0 || x >= W) continue;
-      rect(x, wy, 1, H - wy, to565(0x10343C));
-      px(x, wy, ((x >> 1) & 1) ? to565(0x8FC9BF) : to565(0x2E6A68));
-      if ((x % 9) == 0) px(x, wy + 4, to565(0x1D5A60));
+    for (j = 0; j < 2; j++) {
+      int start = j ? (int)bridge_x1 + 1 : (int)bridge_x0 - (int)SEA_W;
+      int i;
+      for (i = 0; i < (int)SEA_W; i++) {
+        int sx = start + i - (int)cam;
+        int bed = (int)ground_y((float)(start + i));
+        if (sx < 0 || sx >= W) continue;
+        if (bed <= wy) {
+          /* the shelf coming down off the bank: rock, not water */
+          rect(sx, bed, 1, H - bed, col_dirt);
+          px(sx, bed, col_grass);
+        } else {
+          rect(sx, wy, 1, H - wy, to565(0x10343C));
+          px(sx, wy, ((sx >> 1) & 1) ? to565(0x8FC9BF) : to565(0x2E6A68));
+          if ((sx % 9) == 0) px(sx, wy + 4, to565(0x1D5A60));
+        }
+      }
     }
     for (x = bx0; x < bx1; x++) {
       if (x < 0 || x >= W) continue;
-      rect(x, wy - 4, 1, 4, ((x >> 1) & 1) ? to565(0x6A4A2A) : to565(0x8A6238));
+      rect(x, deck - 2, 1, 4, ((x >> 1) & 1) ? to565(0x6A4A2A) : to565(0x8A6238));
       if ((x % 11) == 0) {
-        rect(x, wy - 8, 1, 5, to565(0x3A2A1A));
-        px(x, wy - 9, to565(0x9AB07A));
+        rect(x, deck - 8, 1, 6, to565(0x3A2A1A));
+        px(x, deck - 9, to565(0x9AB07A));
       }
     }
   }

@@ -1,5 +1,13 @@
-THE LAST JOURNEY — Android Edition (v2.2.1)
+THE LAST JOURNEY — Android Edition (v2.2.2)
 ============================================
+
+WHAT'S NEW IN v2.2.2
+---------------------
+- THE LAST BRIDGE STANDS OVER ITS SEA. The water at both ends of the span
+  is lowered well below the planks, and a shallow rock shelf falls away
+  from each bank into the open water. The deck now clearly rides above the
+  sea instead of lying level with it. She can still wade in, climb up onto
+  the planks and walk on to the exit on the far side.
 
 WHAT'S NEW IN v2.2.1
 --------------------
@@ -30,7 +38,7 @@ WHAT'S NEW IN v2.2.0
   percent more and the cold slows it. ELECTRIC: 18 percent more and the
   charge jumps to another foe nearby. Any two mix (hot mist, plasma,
   storm); all three vaporize, with shock and mist together.
-- Same release key: versionName 2.2.1, versionCode 16.
+- Same release key: versionName 2.2.2, versionCode 17.
 
 WHAT'S NEW IN v2.1.1
 --------------------

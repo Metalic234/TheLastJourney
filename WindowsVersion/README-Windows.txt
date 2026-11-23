@@ -1,5 +1,13 @@
-THE LAST JOURNEY — Windows Edition (v2.2.1)
+THE LAST JOURNEY — Windows Edition (v2.2.2)
 ===========================================
+
+WHAT'S NEW IN v2.2.2
+---------------------
+- THE LAST BRIDGE STANDS OVER ITS SEA. The water at both ends of the span
+  is lowered well below the planks, and a shallow rock shelf falls away
+  from each bank into the open water. The deck now clearly rides above the
+  sea instead of lying level with it. She can still wade in, climb up onto
+  the planks and walk on to the exit on the far side.
 
 WHAT'S NEW IN v2.2.1
 --------------------
@@ -27,7 +35,7 @@ WHAT'S NEW IN v2.2.0
 - FIRE, ICE AND ELECTRIC IN HER X, 50 souls each: +15 percent and burning,
   +14 percent and slowing, +18 percent and a charge that jumps. Any two
   mix; all three vaporize with shock and mist.
-- Same release key / save-free install as v2.1.1: version 2.2.1.
+- Same release key / save-free install as v2.1.1: version 2.2.2.
 
 WHAT'S NEW IN v2.1.1
 --------------------

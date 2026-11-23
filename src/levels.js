@@ -982,6 +982,9 @@ function paintCliffs(level, g, rng) {
   for (const sea of level.seas || []) {
     const top = Math.round(sea.surface);
     for (let x = sea.x; x < sea.x + sea.w; x++) {
+      // The seabed climbs to a dry shelf at each bank, so the shoreline is
+      // wherever the rock rises through the waterline: no water on the beach.
+      if (Math.round(level.ground[x]) <= top) continue;
       for (let y = top; y < H; y++) {
         const t = (y - top) / Math.max(1, H - top);
         g.fillStyle = mix('#2b6b69', '#041014', clamp(t * 1.15, 0, 1));
@@ -2477,15 +2480,21 @@ function buildFromConfig(cfg, index) {
     for (const gap of level.gaps) {
       for (let x = gap.x; x < gap.x + gap.w; x++) level.ground[x] = H + 70;
     }
-    // The sea beside the last bridge: the bridge deck is its own level, the
-    // water sits just under the planks, and its lips are shallow enough to
-    // wade. The dragon swims in it on either side of the span.
+    // The sea beside the last bridge lies well below the deck: the span rides
+    // 14px over the waterline instead of sitting level with it. Each bay keeps
+    // shallow rock shelves at both banks that fall away into the open water,
+    // so she can still wade in, climb onto the planks, and reach the exit.
     for (const sea of level.seas) {
       const deck = level.bridges.find((b) => sea.x + sea.w >= b.x && sea.x <= b.x + b.w);
       const base = deck ? deck.y : groundAt(level, sea.x + sea.w * 0.5);
-      sea.surface = base + 2;
-      sea.y = base + 8;
-      for (let x = sea.x; x < sea.x + sea.w; x++) level.ground[x] = sea.y;
+      sea.surface = base + 12;
+      sea.y = base + 22;
+      const lip = Math.max(8, Math.round(sea.w * 0.22));
+      for (let i = 0; i < sea.w; i++) {
+        const edge = Math.min(i, sea.w - 1 - i);
+        const k = Math.min(1, edge / lip);
+        level.ground[sea.x + i] = base + 2 + Math.round((sea.y - base - 2) * k);
+      }
     }
     for (const bridge of level.bridges) {
       level.solids.push({ x: bridge.x, y: bridge.y - 2, w: bridge.w, h: 6 });

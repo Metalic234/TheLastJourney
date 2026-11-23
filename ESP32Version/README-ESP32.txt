@@ -36,10 +36,12 @@ and cannot be walked past.
                            legs, swipes when close, and leaps at her.
   THE WATER DRAGON         ends the burning city. The last road crosses one
                            deep cut on a plank bridge: the sea waits at
-                           either end of the span and the middle is open
-                           air. The dragon rides the water at each end,
-                           leaps the whole bridge, and lands in the water
-                           on the far side, never on the planks.
+                           either end of the span, sunk well below the
+                           planks with a rock shelf off each bank, and the
+                           middle is open air. The dragon rides the water
+                           at each end, leaps the whole bridge, and lands
+                           in the water on the far side, never on the
+                           planks.
                            Every third landing a Steam Blast runs the span
                            and takes a heart — unless she is in the air:
                            it rolls low, so a jump clears it.
