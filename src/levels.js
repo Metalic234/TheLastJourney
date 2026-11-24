@@ -265,8 +265,10 @@ const CONFIGS = [
     ],
     boss: {
       kind: 'dragon',
-      x: 4125,
-      triggerX: 4060,
+      x: 4220,
+      // She is seen the moment she steps onto the approach, well before she
+      // could walk into its chest.
+      triggerX: 3960,
       arenaMin: 4050,
       arenaMax: 4780,
       bridge: 3,
@@ -293,13 +295,6 @@ const CONFIGS = [
       // The last bridge is one unbroken deck across the whole cut: the fight
       // happens on the planks, and there is no hole in it to fall through.
       { x: 4180, w: 520, whale: false },
-    ],
-    // The sea runs under the last bridge and out past both of its ends, so
-    // the span cuts the water into two parts. Both lips are shallow: she can
-    // wade in from the cliff, and the dragon rides the water either side.
-    seas: [
-      { x: 4070, w: 110 },
-      { x: 4700, w: 60 },
     ],
     whaleBridge: 1,
     dolphinBridges: [0, 2],

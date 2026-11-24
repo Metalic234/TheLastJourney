@@ -551,6 +551,15 @@ export class AudioEngine {
       case 'shardCast':
         this.shardCast(t);
         break;
+      case 'fireCast':
+        this.fireCast(t);
+        break;
+      case 'elecCast':
+        this.elecCast(t);
+        break;
+      case 'iceCast':
+        this.iceCast(t);
+        break;
       case 'whale':
         this.sweep(t, 64, 148, 2.8, 0.055, 'sine');
         this.sweep(t + 0.25, 150, 72, 2.3, 0.03, 'triangle');
@@ -823,6 +832,32 @@ export class AudioEngine {
     this.bell(midi(96), t, 0.34, 0.02, false);
     this.bell(midi(103), t + 0.035, 0.22, 0.012, false);
     this.sweep(t + 0.02, 1200, 3200, 0.2, 0.01, 'triangle');
+  }
+
+  // Fire in her X: a low roar with the flame snapping in it.
+  fireCast(t) {
+    this.sweep(t, 110, 330, 0.3, 0.03, 'sawtooth');
+    this.noiseHit(t, 700, 0.34, 0.03, 0.8, 'lowpass');
+    for (let i = 0; i < 4; i++) {
+      this.noiseHit(t + 0.02 + i * 0.045, 1600 + i * 620, 0.07, 0.012, 3.2, 'bandpass');
+    }
+  }
+
+  // The charge: a hard snap and the buzz still running after it.
+  elecCast(t) {
+    this.noiseHit(t, 3400, 0.06, 0.03, 2.2, 'bandpass');
+    this.sweep(t, 1500, 240, 0.14, 0.03, 'square');
+    this.noiseHit(t + 0.055, 5400, 0.13, 0.018, 4.5, 'bandpass');
+    this.noiseHit(t + 0.1, 2600, 0.16, 0.012, 2.0, 'bandpass');
+  }
+
+  // Ice: a pane of glass breaking, all splinters and no weight.
+  iceCast(t) {
+    this.noiseHit(t, 7600, 0.26, 0.024, 6, 'bandpass');
+    this.bell(midi(100), t, 0.3, 0.02, false);
+    this.bell(midi(107), t + 0.04, 0.22, 0.013, false);
+    this.bell(midi(112), t + 0.09, 0.16, 0.008, false);
+    this.noiseHit(t + 0.12, 9200, 0.18, 0.012, 8, 'bandpass');
   }
 
   // A held lightsaber: two detuned saws through a resonant lowpass, ignited

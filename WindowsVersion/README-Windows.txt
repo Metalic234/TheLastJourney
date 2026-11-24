@@ -1,5 +1,22 @@
-THE LAST JOURNEY — Windows Edition (v2.2.3)
+THE LAST JOURNEY — Windows Edition (v2.2.4)
 ===========================================
+
+WHAT'S NEW IN v2.2.4
+---------------------
+- THE LAST FIGHT CAN BE RETRIED. Dying on the last street left her with no
+  breath at all, so the retry began at nothing: her X threw one volley and
+  the street went dark again. A retry now gives her life back whole.
+- THE WARD IS SPENT, NOT MENDED. Her shield bar no longer fills itself at
+  the start of every stage. Whatever is left of it is what the next road
+  starts with, and only the peddler's stall fills it again.
+- HER X WEARS HER ELEMENTS. Fire throws a small fireball with its tail
+  behind it and roars. Ice throws the same white shard she started with,
+  and breaks like glass. Electric throws a violet bolt with a hard snap.
+- THE LAST BRIDGE IS ONLY A BRIDGE. The wells that sat at the first and
+  last stretch of the planks are gone: cliff, one cut, one deck across it.
+  The dragon keeps to the planks, leaps end to end, and lands on the boards.
+- THE DRAGON SEES HER SOONER. The fight starts on the approach to the
+  bridge instead of when she is already standing inside its chest.
 
 WHAT'S NEW IN v2.2.3
 ---------------------

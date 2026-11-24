@@ -34,17 +34,14 @@ and cannot be walked past.
 
   THE TIGER OF THE RUINS   ends the drowned ruins. It stalks her on two
                            legs, swipes when close, and leaps at her.
-  THE WATER DRAGON         ends the burning city. The last road crosses one
-                           deep cut on a plank bridge: the sea waits at
-                           either end of the span, sunk well below the
-                           planks with a rock shelf off each bank, and the
-                           middle is open air. The dragon rides the water
-                           at each end, leaps the whole bridge, and lands
-                           in the water on the far side, never on the
-                           planks. Its leap climbs out of the water high
-                           enough to clear the boards at both ends, a foam
-                           line rides the water where its body meets it,
-                           and spray breaks around it when it comes down.
+  THE WATER DRAGON         ends the burning city. The last road ends in
+                           nothing but cliff and one plank bridge across a
+                           single dark cut: no water, no bays, no wells at
+                           either end of the span. The dragon keeps to the
+                           planks, stands at one end of the deck, leaps the
+                           whole span, and comes down on the boards at the
+                           far end. It sees her from the approach, long
+                           before she reaches its chest.
                            Every third landing a Steam Blast runs the span
                            and takes a heart — unless she is in the air:
                            it rolls low along the planks, so a jump clears
@@ -64,8 +61,8 @@ takes a step: souls in, power out.
   X              leave the stall and take the road
 
   A WARD OF HER OWN     50 souls  a shield bar above her hearts. It takes
-                                  the first blow of every road, and comes
-                                  back whole at the start of each stage.
+                                  the first blow of the run; a new road does
+                                  not mend it, and only the stall fills it.
   FIRE IN HER X         50 souls  shards bite 15 percent harder and set
                                   the keeper burning: 2 percent a second.
   ICE IN HER X          50 souls  shards bite 14 percent harder and the

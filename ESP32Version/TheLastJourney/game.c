@@ -73,8 +73,7 @@ static int gnd_n;
 static int stage_i;
 static float stage_len;
 /* the bridge over the last road's sea */
-#define SEA_W 44.0f
-static float bridge_x0, bridge_x1, arena_y, sea_y;
+static float bridge_x0, bridge_x1, arena_y;
 static int has_bridge;
 
 static uint16_t sky_row[H];
@@ -126,7 +125,7 @@ typedef struct {
   int alive, active, facing;
   float intro, cd, claw_t, pounce_t, pounce_x;
   float hop_t, hop_from, hop_to, lift, steam_t, steam_burst;
-  float splash_t, bob;   /* spray on landing, and the swell it rides in */
+  float bob;             /* the slow swell it rides while it stands */
   float burn_t, ice_t, shock_t;
   int hops;
   float flash;
@@ -374,27 +373,14 @@ static void reset_stage(int idx) {
   bridge_x1 = cfg->bridge_x1;
   has_bridge = bridge_x1 > bridge_x0 + 1.0f;
   arena_y = 0.0f;
-  sea_y = 0.0f;
   if (has_bridge) {
-    int bx, j;
-    /* The span is level, the waterline rides 14px under its planks, and each
-     * bay keeps a shallow rock shelf at both banks that falls away into the
-     * open water, so she can wade in and still climb up to the planks. */
+    int bx;
+    /* The last span is only a bridge: the cliff, one cut, and a level deck
+     * across it. No bays, no water at either end of the planks. */
     arena_y = ground_y((bridge_x0 + bridge_x1) * 0.5f);
-    sea_y = arena_y + 12.0f;
+    if (arena_y > 300.0f) arena_y = ground_y(bridge_x0 - 2.0f);
     for (bx = (int)bridge_x0; bx <= (int)bridge_x1; bx++)
       gnd[gi((float)bx)] = (int16_t)arena_y;
-    for (j = 0; j < 2; j++) {
-      int start = j ? (int)bridge_x1 + 1 : (int)(bridge_x0 - SEA_W);
-      for (bx = 0; bx < (int)SEA_W; bx++) {
-        int xw = start + bx;
-        int edge = bx < (int)SEA_W - 1 - bx ? bx : (int)SEA_W - 1 - bx;
-        float k = edge / 10.0f;
-        if (k > 1.0f) k = 1.0f;
-        if (xw >= 0 && xw <= (int)stage_len)
-          gnd[gi((float)xw)] = (int16_t)(arena_y + 2.0f + 20.0f * k);
-      }
-    }
   }
 
   col_hill_far = to565(cfg->hill_far);
@@ -471,8 +457,8 @@ static void reset_stage(int idx) {
   boss.active = 0;
   boss.x = stage_len * 0.80f;
   boss.home = boss.x;
-  /* the dragon starts in the sea on the near side of its bridge */
-  if (boss.kind == 2 && has_bridge) boss.x = boss.home - 132.0f;
+  /* the dragon keeps to the planks, at the near end of its bridge */
+  if (boss.kind == 2 && has_bridge) boss.x = bridge_x0 + 22.0f;
   boss.base_y = 0.0f;
   boss.facing = -1;
   boss.intro = 1.2f;
@@ -487,14 +473,12 @@ static void reset_stage(int idx) {
   boss.steam_t = 0.0f;
   boss.steam_burst = 0.0f;
   boss.hops = 0;
-  boss.splash_t = 0.0f;
   boss.bob = 0.0f;
   boss.flash = 0.0f;
   boss.burn_t = 0.0f;
   boss.ice_t = 0.0f;
   boss.shock_t = 0.0f;
-  /* The ward the peddler sold her is hers for good, and comes back whole. */
-  shield_hp = shield_on ? 1 : 0;
+  /* The ward is spent, not mended: a road that finds it used leaves it used. */
 
   cam = 0;
   /* The peddler is set up where the road begins: the window opens first. */
@@ -580,12 +564,15 @@ static void update_boss(float dt) {
   float ad, sdt;
   if (!boss.alive) return;
   if (!boss.active) {
-    if (p.x > boss.x - 150.0f) boss.active = 1;
+    /* The keeper of the last bridge sees her from the approach, not from
+     * inside its own chest. */
+    float seen = boss.x - 150.0f;
+    if (boss.kind == 2 && has_bridge) seen = bridge_x0 - 120.0f;
+    if (p.x > seen) boss.active = 1;
     else return;
   }
   if (boss.flash > 0.0f) boss.flash -= dt;
   if (boss.steam_burst > 0.0f) boss.steam_burst -= dt;
-  if (boss.splash_t > 0.0f) boss.splash_t -= dt;
   boss.bob += dt;
   /* fire keeps eating at it: two percent of everything it has, every second */
   if (boss.burn_t > 0.0f) {
@@ -597,7 +584,7 @@ static void update_boss(float dt) {
   if (boss.shock_t > 0.0f) boss.shock_t -= dt;
   /* frost in its blood: everything it does comes slower */
   sdt = boss.ice_t > 0.0f ? dt * 0.55f : dt;
-  boss.base_y = (boss.kind == 2 && has_bridge) ? sea_y : ground_y(boss.x);
+  boss.base_y = (boss.kind == 2 && has_bridge) ? arena_y : ground_y(boss.x);
   if (boss.intro > 0.0f) { boss.intro -= dt; return; }
   boss.facing = (p.x < boss.x) ? -1 : 1;
   ad = fabsf(p.x - boss.x);
@@ -652,14 +639,12 @@ static void update_boss(float dt) {
       boss.hop_t -= sdt;
       k = 1.0f - boss.hop_t / 0.9f;
       boss.x = boss.hop_from + (boss.hop_to - boss.hop_from) * k;
-      /* A full arc: the bays sit well under the deck now, so the leap has to
-       * climb out of the water fast enough to clear the planks at both ends of
-       * the span instead of grazing the last boards. */
+      /* One long arc from end to end of the deck, so the leap clears the
+       * whole span instead of skimming the boards at either end. */
       boss.lift = powf(sinf(k * 3.14159f), 0.72f) * 44.0f;
       if (boss.hop_t <= 0.0f) {
         boss.lift = 0.0f;
         boss.hops++;
-        boss.splash_t = 0.35f;
         if (boss.hops % 3 == 0) boss.steam_t = 0.85f;
         boss.cd = 0.8f;
       }
@@ -669,7 +654,13 @@ static void update_boss(float dt) {
     boss.cd -= sdt;
     if (boss.cd <= 0.0f) {
       boss.hop_from = boss.x;
-      boss.hop_to = (boss.x < boss.home) ? boss.home + 132.0f : boss.home - 132.0f;
+      if (has_bridge) {
+        /* end to end of the deck, never off it */
+        boss.hop_to = (boss.x < (bridge_x0 + bridge_x1) * 0.5f)
+          ? bridge_x1 - 22.0f : bridge_x0 + 22.0f;
+      } else {
+        boss.hop_to = (boss.x < boss.home) ? boss.home + 132.0f : boss.home - 132.0f;
+      }
       boss.hop_to = clampf(boss.hop_to, 24.0f, stage_len - 24.0f);
       boss.hop_t = 0.9f;
       boss.cd = 0.8f;
@@ -888,7 +879,7 @@ static void draw_world(void) {
   for (x = 0; x < W; x++) {
     float wx = cam + x;
     int g;
-    if (has_bridge && wx >= bridge_x0 - SEA_W - 1.0f && wx <= bridge_x1 + SEA_W + 1.0f) continue;
+    if (has_bridge && wx >= bridge_x0 - 1.0f && wx <= bridge_x1 + 1.0f) continue;
     g = gnd[gi(wx)];
     if (g >= H || g >= 300) continue;
     rect(x, g, 1, H - g, col_dirt);
@@ -897,35 +888,14 @@ static void draw_world(void) {
   }
 
   if (has_bridge) {
-    /* The span rides over one cut: dark air under the planks, and the sea
-     * lying well below the deck at either end of the bridge. Each bay keeps
-     * a rocky shelf at both banks and open water between them. */
+    /* The span rides over one cut: dark air under the planks, and nothing
+     * at either end of the bridge but the cliff it lands on. */
     int bx0 = (int)(bridge_x0 - cam);
     int bx1 = (int)(bridge_x1 - cam);
     int deck = (int)arena_y;
-    int wy = (int)sea_y;
-    int j;
-    for (x = bx0 - (int)SEA_W; x < bx1 + (int)SEA_W; x++) {
+    for (x = bx0 - 1; x < bx1 + 1; x++) {
       if (x < 0 || x >= W) continue;
       rect(x, deck + 4, 1, H - deck - 4, to565(0x08141A));
-    }
-    for (j = 0; j < 2; j++) {
-      int start = j ? (int)bridge_x1 + 1 : (int)bridge_x0 - (int)SEA_W;
-      int i;
-      for (i = 0; i < (int)SEA_W; i++) {
-        int sx = start + i - (int)cam;
-        int bed = (int)ground_y((float)(start + i));
-        if (sx < 0 || sx >= W) continue;
-        if (bed <= wy) {
-          /* the shelf coming down off the bank: rock, not water */
-          rect(sx, bed, 1, H - bed, col_dirt);
-          px(sx, bed, col_grass);
-        } else {
-          rect(sx, wy, 1, H - wy, to565(0x10343C));
-          px(sx, wy, ((sx >> 1) & 1) ? to565(0x8FC9BF) : to565(0x2E6A68));
-          if ((sx % 9) == 0) px(sx, wy + 4, to565(0x1D5A60));
-        }
-      }
     }
     for (x = bx0; x < bx1; x++) {
       if (x < 0 || x >= W) continue;
@@ -968,13 +938,33 @@ static void draw_world(void) {
 
   draw_boss();
 
-  for (i = 0; i < MAX_SHARDS; i++) {
-    int sx, sy;
-    if (!shards[i].live) continue;
-    sx = (int)(shards[i].x - cam);
-    sy = (int)shards[i].y;
-    rect(sx, sy, 3, 1, to565(0xFFFFFF));
-    px(sx - 2, sy, to565(0x9FE8FF));
+  /* Her X wears whatever the peddler put in it: flame, a violet bolt, or the
+   * same white shard she started with. */
+  {
+    uint16_t scol = to565(0x9FE8FF);
+    if (pw_fire) scol = to565(0xFF8A3C);
+    else if (pw_elec) scol = to565(0xC9A6FF);
+    else if (pw_ice) scol = to565(0xBFE6FF);
+    for (i = 0; i < MAX_SHARDS; i++) {
+      int sx, sy;
+      if (!shards[i].live) continue;
+      sx = (int)(shards[i].x - cam);
+      sy = (int)shards[i].y;
+      if (pw_fire) {
+        /* a small ball of flame with its tail behind it */
+        rect(sx - 3, sy, 3, 1, scol);
+        px(sx, sy, to565(0xFFD166));
+        px(sx + 1, sy, to565(0xFFF6D8));
+      } else if (pw_elec) {
+        /* a violet bolt, jagged end to end */
+        px(sx, sy - 1, scol);
+        px(sx + 1, sy, to565(0xF3E8FF));
+        px(sx + 2, sy - 1, scol);
+      } else {
+        rect(sx, sy, 3, 1, to565(0xFFFFFF));
+        px(sx - 2, sy, scol);
+      }
+    }
   }
 
   if (p.invuln <= 0 || sinf(p.invuln * 28.0f) > 0) {
@@ -1054,27 +1044,6 @@ static void draw_boss(void) {
         int bw = 120 + i * 40;
         int top = dk - 30 - i * 6;
         rect(bx - bw / 2, top, bw, dk - 2 - top, i == 2 ? to565(0xDFF8F4) : to565(0xCFEAE4));
-      }
-    }
-    /* It rides the bay, not the planks: foam where the body meets the water,
-     * and a ring of spray when a leap comes back down into it. */
-    if (has_bridge && ground_y(boss.x) > sea_y) {
-      int wy = (int)sea_y;
-      int wob = (int)(sinf(boss.bob * 2.6f) * 1.5f);
-      px(bx - 18, wy + wob, to565(0x8FC9BF));
-      px(bx - 19, wy + wob, to565(0x2E6A68));
-      px(bx + 16, wy + wob, to565(0x8FC9BF));
-      px(bx + 17, wy + wob, to565(0x2E6A68));
-      if (boss.splash_t > 0.0f) {
-        int k = (int)((1.0f - boss.splash_t / 0.35f) * 8.0f);
-        for (i = 0; i < 3; i++) {
-          int dx = 15 + k + i * 5;
-          int hh = 4 - i;
-          rect(bx + dx, wy - hh - k / 3, 2, hh, to565(0xDFF8F4));
-          rect(bx - dx - 1, wy - hh - k / 3, 2, hh, to565(0xDFF8F4));
-        }
-        px(bx - 10, wy - 2, to565(0xCFEAE4));
-        px(bx + 9, wy - 2, to565(0xCFEAE4));
       }
     }
   }

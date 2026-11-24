@@ -80,6 +80,67 @@ function makeVignette() {
   return c;
 }
 
+// What her X looks like once the peddler's elements are in it: a fireball, a
+// purple bolt, or the same bright ice shard she started with.
+function drawShardSprite(g, x, y, vx, vy, spin, look) {
+  g.save();
+  g.translate(Math.round(x), Math.round(y));
+  g.rotate(Math.atan2(vy, vx) + spin);
+  g.globalCompositeOperation = 'lighter';
+  if (look === 'fire') {
+    // a small ball of flame with its tail behind it
+    g.globalAlpha = 0.4;
+    g.fillStyle = '#ff6a2c';
+    g.fillRect(-21, -3, 19, 6);
+    glow(g, 0, 0, 15, '#ffb066', 0.85);
+    g.fillStyle = '#ff7a3c';
+    g.beginPath();
+    g.arc(0, 0, 4.5, 0, TAU);
+    g.fill();
+    g.fillStyle = '#ffd166';
+    g.beginPath();
+    g.arc(0.5, 0, 2.6, 0, TAU);
+    g.fill();
+    g.fillStyle = '#fff6d8';
+    g.fillRect(-1, -1, 2, 2);
+  } else if (look === 'elec') {
+    // a violet bolt, jagged end to end
+    glow(g, 0, 0, 13, '#c9a6ff', 0.8);
+    g.strokeStyle = '#c9a6ff';
+    g.lineWidth = 2;
+    g.beginPath();
+    g.moveTo(-8, 0);
+    g.lineTo(-4, -3);
+    g.lineTo(0, 1);
+    g.lineTo(4, -2);
+    g.lineTo(8, 0);
+    g.stroke();
+    g.strokeStyle = '#f3e8ff';
+    g.lineWidth = 1;
+    g.beginPath();
+    g.moveTo(-7, 0);
+    g.lineTo(-4, -2.6);
+    g.lineTo(0, 1);
+    g.lineTo(4, -1.6);
+    g.lineTo(7, 0);
+    g.stroke();
+  } else {
+    // the ice shard: cold, white, and unchanged
+    glow(g, 0, 0, 12, '#dff3ff', 0.6);
+    g.fillStyle = '#ffffff';
+    g.beginPath();
+    g.moveTo(6, 0);
+    g.lineTo(0, -3);
+    g.lineTo(-5, 0);
+    g.lineTo(0, 3);
+    g.closePath();
+    g.fill();
+    g.fillStyle = '#bdeaff';
+    g.fillRect(-3, -1, 5, 2);
+  }
+  g.restore();
+}
+
 function makeGrain(seed) {
   const c = makeCanvas(180, 150);
   const g = c.getContext('2d');
@@ -248,6 +309,7 @@ export class Game {
     this.stamina = this.staminaMax;
     this.winded = false;
     this.lifeHP = null;
+    this.shieldHP = null;
     this.soulPops = [];
     this.bought.clear();
     this.shop = null;
@@ -287,6 +349,7 @@ export class Game {
     this.fadeTarget = 0;
     this.frozen = false;
     this.lifeHP = null;
+    this.shieldHP = null;
     this.stamina = this.staminaMax;
     this.winded = false;
     this.loadLevel(index);
@@ -305,6 +368,10 @@ export class Game {
     this.fade = 1;
     this.fadeTarget = 0;
     this.frozen = false;
+    // Her last breath stopped at nothing. Going back to the street gives it
+    // back whole, or the retry would start her at zero and die on the first
+    // frame — which is what left her X with nowhere to go.
+    this.lifeHP = null;
     this.beginFinale();
   }
 
@@ -876,6 +943,24 @@ export class Game {
     return 1 + bite + mix;
   }
 
+  // Fire wins the look, then the charge, then the cold: one X, one element.
+  shardLook() {
+    const powers = this.elementPowers();
+    if (powers.includes('fire')) return 'fire';
+    if (powers.includes('elec')) return 'elec';
+    if (powers.includes('ice')) return 'ice';
+    return 'plain';
+  }
+
+  // Each element throws its own sound: flame, a shock, breaking glass.
+  shardSound() {
+    const look = this.shardLook();
+    if (look === 'fire') return 'fireCast';
+    if (look === 'elec') return 'elecCast';
+    if (look === 'ice') return 'iceCast';
+    return 'shardCast';
+  }
+
   powerName() {
     const powers = this.elementPowers();
     if (powers.length === 3) return 'VAPOUR AND SHOCK';
@@ -1098,6 +1183,7 @@ export class Game {
 
   applyUpgrade(id) {
     if (id === 'shield') {
+      this.shieldHP = SHIELD_MAX;
       if (this.combat) this.combat.shield = this.combat.shieldMax;
       return;
     }
@@ -1750,7 +1836,7 @@ export class Game {
         spin: (i - 1) * 0.55,
       });
     }
-    this.audio.play('shardCast');
+    this.audio.play(this.shardSound());
     for (let i = 0; i < 7; i++) {
       this.spawn({
         type: 'spark', x: p.x + 8, y: p.y - 20,
@@ -2174,7 +2260,11 @@ export class Game {
       max: this.lifeMax,
       hurt: 0,
       invuln: 0,
-      shield: this.upgradeCount('shield') > 0 ? SHIELD_MAX : 0,
+      // The ward is spent, not mended: it carries from road to road the way
+      // her life does, and only the peddler fills it back up.
+      shield: this.upgradeCount('shield') > 0
+        ? (this.shieldHP == null ? SHIELD_MAX : clamp(this.shieldHP, 0, SHIELD_MAX))
+        : 0,
       shieldMax: SHIELD_MAX,
       dogs,
       spiders,
@@ -2410,6 +2500,7 @@ export class Game {
 
     // Whatever she has left is what the next road starts with.
     this.lifeHP = c.hp;
+    this.shieldHP = c.shield;
     if (c.hp <= 0) this.showWildsDown();
   }
 
@@ -2643,18 +2734,11 @@ export class Game {
     const L = this.level;
     const p = this.player;
     const bridge = L.bridges && L.bridges[b.bridge ?? -1];
-    // The bridge cuts the sea in two. The dragon lives in the water on one
-    // side of it and leaps the whole span into the water on the other: never
-    // on the planks themselves.
-    const seas = L.seas || [];
-    const seaL = seas.length ? seas[0] : null;
-    const seaR = seas.length > 1 ? seas[seas.length - 1] : null;
-    const sideL = seaL ? seaL.x + seaL.w * 0.5
-      : (bridge ? bridge.x + 26 : L.boss.arenaMin + 40);
-    const sideR = seaR ? seaR.x + seaR.w * 0.5
-      : (bridge ? bridge.x + bridge.w - 26 : L.boss.arenaMax - 40);
-    if (seaL) b.baseY = seaL.surface;
-    else if (bridge) b.baseY = bridge.y;
+    // The last span is only a bridge: cliff, a cut, and one deck across it.
+    // The dragon keeps to the planks, one end of the span to the other.
+    const sideL = bridge ? bridge.x + 26 : L.boss.arenaMin + 40;
+    const sideR = bridge ? bridge.x + bridge.w - 26 : L.boss.arenaMax - 40;
+    b.baseY = bridge ? bridge.y : groundAt(L, b.x);
     b.flash = Math.max(0, b.flash - dt * 3.8);
     b.stomp = Math.max(0, b.stomp - dt);
     b.intro = Math.max(0, b.intro - dt);
@@ -2702,15 +2786,15 @@ export class Game {
       b.jumpT = Math.max(0, b.jumpT - dt);
       const k = 1 - b.jumpT / b.jumpMax;
       b.x = lerp(b.jumpFrom, b.jumpTo, k);
-      // A full arc, not a half one: the bays sit well under the deck, so the
-      // leap has to climb out of the water fast enough to clear the planks at
-      // both ends of the span instead of grazing the last boards.
+      // One long arc from end to end of the deck, so the leap clears the
+      // whole span instead of skimming the boards at either end.
       b.lift = Math.pow(Math.sin(k * Math.PI), 0.72) * 74;
       if (b.jumpT <= 0) {
         b.lift = 0;
         b.stomp = 0.4;
         b.hops = (b.hops || 0) + 1;
-        // It comes down in the water: a ring of spray goes up around it.
+        // It comes down on the planks: the deck shudders and a ring of pale
+        // spray comes off the boards around it.
         for (let i = 0; i < 16; i++) {
           this.spawn({
             type: i % 2 ? 'smoke' : 'mote',
@@ -2911,7 +2995,7 @@ export class Game {
         spin: (i - 1) * 0.55,
       });
     }
-    this.audio.play('shardCast');
+    this.audio.play(this.shardSound());
     for (let i = 0; i < 7; i++) {
       this.spawn({
         type: 'spark',
@@ -4500,25 +4584,11 @@ export class Game {
   drawWildsFront(g) {
     const c = this.combat;
     if (!c) return;
+    const look = this.shardLook();
     for (const shard of c.shards) {
       const sx = shard.x - this.cam.x;
       if (sx < -20 || sx > W + 20) continue;
-      g.save();
-      g.translate(Math.round(sx), Math.round(shard.y));
-      g.rotate(Math.atan2(shard.vy, shard.vx) + shard.spin);
-      g.globalCompositeOperation = 'lighter';
-      glow(g, 0, 0, 12, '#dff3ff', 0.6);
-      g.fillStyle = '#ffffff';
-      g.beginPath();
-      g.moveTo(6, 0);
-      g.lineTo(0, -3);
-      g.lineTo(-5, 0);
-      g.lineTo(0, 3);
-      g.closePath();
-      g.fill();
-      g.fillStyle = '#bdeaff';
-      g.fillRect(-3, -1, 5, 2);
-      g.restore();
+      drawShardSprite(g, sx, shard.y, shard.vx, shard.vy, shard.spin, look);
     }
     for (const beam of c.guardianLasers) this.drawGuardianAnswer(g, beam);
   }
@@ -5185,27 +5255,14 @@ export class Game {
 
     this.drawPlayer(g);
 
-    // Bright, angular shards thrown by the girl.
+    // Bright shards thrown by the girl: fire, ice or the charge, according
+    // to what the peddler has put in her X.
+    const look = this.shardLook();
     for (const shard of battle.shards) {
       const sx = shard.x - this.cam.x;
       const sy = shard.y;
       if (sx < -20 || sx > W + 20) continue;
-      g.save();
-      g.translate(Math.round(sx), Math.round(sy));
-      g.rotate(Math.atan2(shard.vy, shard.vx) + shard.spin);
-      g.globalCompositeOperation = 'lighter';
-      glow(g, 0, 0, 12, '#dff3ff', 0.6);
-      g.fillStyle = '#ffffff';
-      g.beginPath();
-      g.moveTo(6, 0);
-      g.lineTo(0, -3);
-      g.lineTo(-5, 0);
-      g.lineTo(0, 3);
-      g.closePath();
-      g.fill();
-      g.fillStyle = '#bdeaff';
-      g.fillRect(-3, -1, 5, 2);
-      g.restore();
+      drawShardSprite(g, sx, sy, shard.vx, shard.vy, shard.spin, look);
     }
 
     // Blue's long-range shards: colder and heavier than hers, with a comet tail.
