@@ -1,5 +1,14 @@
-THE LAST JOURNEY — Android Edition (v2.2.2)
+THE LAST JOURNEY — Android Edition (v2.2.3)
 ============================================
+
+WHAT'S NEW IN v2.2.3
+---------------------
+- THE WATER DRAGON MEETS ITS NEW BRIDGE PROPERLY. Its leap now climbs
+  higher out of the water, so it clears the planks at both ends of the
+  span instead of grazing the last boards on the way down. The steam wall
+  is hung off the deck, so it stands on the planks rather than hanging
+  under them, and its landing splash still breaks on the water where it
+  comes down.
 
 WHAT'S NEW IN v2.2.2
 ---------------------

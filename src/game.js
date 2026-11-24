@@ -2702,7 +2702,10 @@ export class Game {
       b.jumpT = Math.max(0, b.jumpT - dt);
       const k = 1 - b.jumpT / b.jumpMax;
       b.x = lerp(b.jumpFrom, b.jumpTo, k);
-      b.lift = Math.sin(k * Math.PI) * 74;
+      // A full arc, not a half one: the bays sit well under the deck, so the
+      // leap has to climb out of the water fast enough to clear the planks at
+      // both ends of the span instead of grazing the last boards.
+      b.lift = Math.pow(Math.sin(k * Math.PI), 0.72) * 74;
       if (b.jumpT <= 0) {
         b.lift = 0;
         b.stomp = 0.4;
@@ -4395,7 +4398,10 @@ export class Game {
           // the blast itself: a wall of steam coming off the bridge
           if (boss.steamBurst > 0) {
             const k = 1 - clamp(boss.steamBurst / 0.55, 0, 1);
-            const my = (boss.baseY ?? groundAt(L, boss.x)) - 30;
+            // The wall rolls along the planks, so it hangs off the deck and
+            // not off the waterline the dragon rides.
+            const br = L.bridges && L.bridges[boss.bridge ?? -1];
+            const my = (br ? br.y : (boss.baseY ?? groundAt(L, boss.x))) - 18;
             g.save();
             g.globalCompositeOperation = 'lighter';
             for (let i = 0; i < 3; i++) {

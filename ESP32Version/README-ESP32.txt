@@ -41,10 +41,14 @@ and cannot be walked past.
                            middle is open air. The dragon rides the water
                            at each end, leaps the whole bridge, and lands
                            in the water on the far side, never on the
-                           planks.
+                           planks. Its leap climbs out of the water high
+                           enough to clear the boards at both ends, a foam
+                           line rides the water where its body meets it,
+                           and spray breaks around it when it comes down.
                            Every third landing a Steam Blast runs the span
                            and takes a heart — unless she is in the air:
-                           it rolls low, so a jump clears it.
+                           it rolls low along the planks, so a jump clears
+                           it.
 
 Shards wear a keeper down; its health bar sits at the top of the screen.
 Both of them are worth a payout from the road's soul purse, and the road

@@ -126,6 +126,7 @@ typedef struct {
   int alive, active, facing;
   float intro, cd, claw_t, pounce_t, pounce_x;
   float hop_t, hop_from, hop_to, lift, steam_t, steam_burst;
+  float splash_t, bob;   /* spray on landing, and the swell it rides in */
   float burn_t, ice_t, shock_t;
   int hops;
   float flash;
@@ -390,7 +391,7 @@ static void reset_stage(int idx) {
         int edge = bx < (int)SEA_W - 1 - bx ? bx : (int)SEA_W - 1 - bx;
         float k = edge / 10.0f;
         if (k > 1.0f) k = 1.0f;
-        if (xw >= 0 && xw < gnd_n)
+        if (xw >= 0 && xw <= (int)stage_len)
           gnd[gi((float)xw)] = (int16_t)(arena_y + 2.0f + 20.0f * k);
       }
     }
@@ -486,6 +487,8 @@ static void reset_stage(int idx) {
   boss.steam_t = 0.0f;
   boss.steam_burst = 0.0f;
   boss.hops = 0;
+  boss.splash_t = 0.0f;
+  boss.bob = 0.0f;
   boss.flash = 0.0f;
   boss.burn_t = 0.0f;
   boss.ice_t = 0.0f;
@@ -582,6 +585,8 @@ static void update_boss(float dt) {
   }
   if (boss.flash > 0.0f) boss.flash -= dt;
   if (boss.steam_burst > 0.0f) boss.steam_burst -= dt;
+  if (boss.splash_t > 0.0f) boss.splash_t -= dt;
+  boss.bob += dt;
   /* fire keeps eating at it: two percent of everything it has, every second */
   if (boss.burn_t > 0.0f) {
     boss.burn_t -= dt;
@@ -647,10 +652,14 @@ static void update_boss(float dt) {
       boss.hop_t -= sdt;
       k = 1.0f - boss.hop_t / 0.9f;
       boss.x = boss.hop_from + (boss.hop_to - boss.hop_from) * k;
-      boss.lift = sinf(k * 3.14159f) * 34.0f;
+      /* A full arc: the bays sit well under the deck now, so the leap has to
+       * climb out of the water fast enough to clear the planks at both ends of
+       * the span instead of grazing the last boards. */
+      boss.lift = powf(sinf(k * 3.14159f), 0.72f) * 44.0f;
       if (boss.hop_t <= 0.0f) {
         boss.lift = 0.0f;
         boss.hops++;
+        boss.splash_t = 0.35f;
         if (boss.hops % 3 == 0) boss.steam_t = 0.85f;
         boss.cd = 0.8f;
       }
@@ -1038,8 +1047,34 @@ static void draw_boss(void) {
     rect(bx + 4, by - 10, 3, 10, to565(0x16424A));
     if (boss.steam_t > 0.0f) disc(bx + 23, by - 24, 3, to565(0xDFF8F4));
     if (boss.steam_burst > 0.0f) {
+      /* It rolls along the planks, so it is hung off the deck and not off the
+       * waterline: the wall stands on the boards instead of under them. */
+      int dk = (int)((has_bridge && boss.base_y > 1.0f) ? arena_y : boss.base_y - 26.0f);
       for (i = 0; i < 3; i++) {
-        rect(bx - 60 - i * 14, by - 36 - i * 5, 120 + i * 24, 34 + i * 8, to565(0xCFEAE4));
+        int bw = 120 + i * 40;
+        int top = dk - 30 - i * 6;
+        rect(bx - bw / 2, top, bw, dk - 2 - top, i == 2 ? to565(0xDFF8F4) : to565(0xCFEAE4));
+      }
+    }
+    /* It rides the bay, not the planks: foam where the body meets the water,
+     * and a ring of spray when a leap comes back down into it. */
+    if (has_bridge && ground_y(boss.x) > sea_y) {
+      int wy = (int)sea_y;
+      int wob = (int)(sinf(boss.bob * 2.6f) * 1.5f);
+      px(bx - 18, wy + wob, to565(0x8FC9BF));
+      px(bx - 19, wy + wob, to565(0x2E6A68));
+      px(bx + 16, wy + wob, to565(0x8FC9BF));
+      px(bx + 17, wy + wob, to565(0x2E6A68));
+      if (boss.splash_t > 0.0f) {
+        int k = (int)((1.0f - boss.splash_t / 0.35f) * 8.0f);
+        for (i = 0; i < 3; i++) {
+          int dx = 15 + k + i * 5;
+          int hh = 4 - i;
+          rect(bx + dx, wy - hh - k / 3, 2, hh, to565(0xDFF8F4));
+          rect(bx - dx - 1, wy - hh - k / 3, 2, hh, to565(0xDFF8F4));
+        }
+        px(bx - 10, wy - 2, to565(0xCFEAE4));
+        px(bx + 9, wy - 2, to565(0xCFEAE4));
       }
     }
   }
