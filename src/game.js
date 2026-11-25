@@ -1265,6 +1265,18 @@ export class Game {
     return this.lifeHP == null || this.lifeHP >= this.lifeMax;
   }
 
+  // The ward is bought once and sold back whenever it has been spent: the
+  // road does not mend it, but the peddler will fill it again for the price.
+  wardHP() {
+    if (this.upgradeCount('shield') <= 0) return 0;
+    if (this.combat) return this.combat.shield;
+    return this.shieldHP == null ? 0 : this.shieldHP;
+  }
+
+  wardIsWhole() {
+    return this.wardHP() >= SHIELD_MAX;
+  }
+
   updateShop(dt) {
     const s = this.shop;
     if (!s) return;
@@ -1302,6 +1314,11 @@ export class Game {
     }
     if (item.id === 'heal' && this.lifeIsFull()) {
       s.notice = { text: 'HER BREATH IS ALREADY WHOLE.', t: 1.8, color: '#8a8296' };
+      this.audio.play('whisper');
+      return;
+    }
+    if (item.id === 'shield' && this.wardIsWhole()) {
+      s.notice = { text: 'HER WARD IS ALREADY WHOLE.', t: 1.8, color: '#8a8296' };
       this.audio.play('whisper');
       return;
     }
@@ -2634,7 +2651,17 @@ export class Game {
     for (const shard of c.shards) {
       shard.life += dt;
       const target = shard.target;
-      if (!target || !target.alive || shard.life > 2.0) continue;
+      // A volley thrown down an empty road keeps its course and burns itself
+      // out; only a shard with someone to find turns and follows them.
+      if (!target || !target.alive) {
+        if (shard.free && shard.life < 1.2) {
+          shard.x += shard.vx * dt;
+          shard.y += shard.vy * dt;
+          keep.push(shard);
+        }
+        continue;
+      }
+      if (shard.life > 2.0) continue;
       const ty = target === c.boss ? this.bossAimY(c.boss) : groundAt(L, target.x) - 9;
       const dx = target.x - shard.x;
       const dy = ty - shard.y;
@@ -3128,11 +3155,25 @@ export class Game {
       const d = Math.abs(c.boss.x - p.x);
       if (d < best) target = c.boss;
     }
-    if (!target) return;
-
+    // Nothing on the road, or nothing close enough to be caught: she throws
+    // anyway, and the volley flies the way she faces until it has spent itself.
     for (let i = 0; i < 3; i++) {
       const sx = p.x + p.facing * 8;
       const sy = p.y - 20 + (i - 1) * 3;
+      if (!target) {
+        const a = (p.facing || 1) > 0 ? -0.05 : Math.PI + 0.05;
+        c.shards.push({
+          x: sx,
+          y: sy,
+          vx: Math.cos(a) * 280,
+          vy: Math.sin(a) * 280 + (i - 1) * 10,
+          target: null,
+          free: true,
+          life: 0,
+          spin: (i - 1) * 0.55,
+        });
+        continue;
+      }
       const ty = target === c.boss ? this.bossAimY(c.boss) : groundAt(this.level, target.x) - 9;
       const dx = target.x - sx;
       const dy = ty - sy;

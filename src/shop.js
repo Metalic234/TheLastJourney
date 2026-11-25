@@ -10,9 +10,11 @@ export const SHOP_ITEMS = [
     id: 'shield',
     name: 'A WARD OF HER OWN',
     cost: 50,
-    max: 1,
+    // Once owned, the ward can be bought back every time it has been spent,
+    // the way her health can be refilled.
+    max: 999,
     color: '#8fd8ff',
-    desc: 'A SHIELD BAR SITS ABOVE HER LIFE AND TAKES THE FIRST BLOW OF EVERY ROAD. IT IS NOT MENDED BETWEEN ROADS: ONLY THIS STALL FILLS IT AGAIN.',
+    desc: 'A SHIELD BAR SITS ABOVE HER LIFE AND TAKES THE FIRST BLOW OF EVERY ROAD. WHEN IT IS SPENT, THIS STALL FILLS IT AGAIN: THE ROAD NEVER WILL.',
     bought: 'THE AIR CLOSES AROUND HER SHOULDERS.',
   },
   {
@@ -122,13 +124,16 @@ export function drawShopOverlay(g, game) {
 
     const owned = game.upgradeCount(item.id);
     const soldOut = owned >= item.max;
+    const whole = !soldOut && item.id === 'shield' && game.wardIsWhole();
     const afford = game.souls >= item.cost;
-    const nameCol = soldOut ? '#6b6478' : afford ? item.color : '#8a8296';
+    const nameCol = soldOut || whole ? '#6b6478' : afford ? item.color : '#8a8296';
 
     drawText(g, item.name, px + 26, y, { color: nameCol, scale: 1, spacing: 1 });
 
-    drawText(g, soldOut ? 'OWNED' : `${item.cost} SOULS`, px + pw - 14, y, {
-      align: 'right', color: soldOut ? '#6b6478' : afford ? '#ffd9a0' : '#8a8296', scale: 1,
+    drawText(g, soldOut ? 'OWNED' : whole ? 'WHOLE' : `${item.cost} SOULS`, px + pw - 14, y, {
+      align: 'right',
+      color: soldOut || whole ? '#6b6478' : afford ? '#ffd9a0' : '#8a8296',
+      scale: 1,
     });
   }
 

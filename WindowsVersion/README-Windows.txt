@@ -1,5 +1,18 @@
-THE LAST JOURNEY — Windows Edition (v2.2.5)
+THE LAST JOURNEY — Windows Edition (v2.2.6)
 ===========================================
+
+WHAT'S NEW IN v2.2.6
+---------------------
+- HER X IS NEVER IDLE. On a stretch of road with nothing on it, X used to do
+  nothing at all: the volley needed something to aim at before it would
+  leave her hand. She throws on an empty road now, and the shards fly the
+  way she faces until they burn themselves out. The moment anything is in
+  reach they turn and find it, exactly as before.
+- THE WARD CAN BE BOUGHT BACK. Once the shield bar was broken the stall
+  showed the ward as OWNED for the rest of the run, however many souls she
+  carried. It is sold like her health now: while the bar is whole the stall
+  marks it WHOLE, and once it has been spent 50 souls fills it to the brim
+  again. The road still never mends it by itself.
 
 WHAT'S NEW IN v2.2.5
 ---------------------

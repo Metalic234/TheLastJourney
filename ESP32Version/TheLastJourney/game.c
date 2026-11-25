@@ -167,7 +167,7 @@ static const char *SHOP_NAME[SHOP_ITEMS] = {
 };
 static const int SHOP_COST[SHOP_ITEMS] = { 50, 50, 50, 50, 150, 10 };
 static const char *SHOP_DESC[SHOP_ITEMS] = {
-  "A BAR ABOVE HER LIFE. IT TAKES THE FIRST BLOW.",
+  "A BAR ABOVE HER LIFE. BUY IT BACK WHEN IT BREAKS.",
   "SHARDS BITE 15% HARDER AND BURN 2% A SECOND.",
   "SHARDS BITE 14% HARDER AND SLOW WHAT THEY TOUCH.",
   "SHARDS BITE 18% HARDER AND THE CHARGE JUMPS.",
@@ -685,7 +685,9 @@ static void update_shop(int left_pressed, int right_pressed, int jump_pressed, i
 
   if (shop_sel >= SHOP_ITEMS) { leave_shop(); return; }
   if (shop_sel == 0) {
-    if (!shield_on && souls >= SHOP_COST[0]) {
+    /* The ward is hers for good, but a spent one is bought back here: the
+     * road does not mend it, and neither does anything else. */
+    if (shield_hp <= 0 && souls >= SHOP_COST[0]) {
       souls -= SHOP_COST[0];
       shield_on = 1;
       shield_hp = 1;
@@ -1231,7 +1233,7 @@ static void draw_shop(void) {
       continue;
     }
     label = SHOP_NAME[i];
-    if (i == 0) owned = shield_on;
+    if (i == 0) owned = shield_hp > 0 ? 2 : 0;
     else if (i == 1) owned = pw_fire;
     else if (i == 2) owned = pw_ice;
     else if (i == 3) owned = pw_elec;
@@ -1245,7 +1247,7 @@ static void draw_shop(void) {
     }
     if (owned == 2) {
       text(label, 38, y, 1, to565(0x6B6478));
-      text("WHOLE", W - 60, y, 1, to565(0x6B6478));
+      text(i == 0 ? "WARDED" : "WHOLE", W - 60, y, 1, to565(0x6B6478));
       continue;
     }
     text(label, 38, y, 1, souls >= SHOP_COST[i] ? to565(0xF6E2C0) : to565(0x8A8296));

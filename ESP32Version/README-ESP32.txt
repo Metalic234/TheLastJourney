@@ -20,7 +20,9 @@ CONTROLS
   LEFT / RIGHT   walk
   JUMP           jump (hold does nothing here; it is a plain jump)
   SHARD          throw a shard. Spiders die in one hit; touching one costs
-                 a heart. HOLD SHARD while walking and she runs: the sprint
+                 a heart. She throws down an empty road too: the shard flies
+                 the way she faces and burns out by itself.
+                 HOLD SHARD while walking and she runs: the sprint
                  spends her breath (the thin bar under the hearts) and it
                  comes back while she walks. While a keeper is standing she
                  throws in BOTH directions, so the aim is on it either way.
@@ -63,6 +65,7 @@ takes a step: souls in, power out.
   A WARD OF HER OWN     50 souls  a shield bar above her hearts. It takes
                                   the first blow of the run; a new road does
                                   not mend it, and only the stall fills it.
+                                  Once broken it is sold back at the price.
   FIRE IN HER X         50 souls  shards bite 15 percent harder and set
                                   the keeper burning: 2 percent a second.
   ICE IN HER X          50 souls  shards bite 14 percent harder and the
