@@ -1,5 +1,15 @@
-THE LAST JOURNEY — Windows Edition (v2.2.4)
+THE LAST JOURNEY — Windows Edition (v2.2.5)
 ===========================================
+
+WHAT'S NEW IN v2.2.5
+---------------------
+- HER X WEARS THE MIX TOO. With two or three elements bought, her X threw
+  the plain fireball whatever else was in it, so HOT MIST, PLASMA and STORM
+  all looked like fire. Fire and ice now throw a scalding cloud with the
+  ember still glowing inside it. Fire and the charge throw the violet bolt
+  sheathed in flame. Ice and the charge throw cold lightning with a crystal
+  riding on it. All three throw the flame tail, the violet charge and the
+  cold white head at once. One element on its own looks exactly as before.
 
 WHAT'S NEW IN v2.2.4
 ---------------------

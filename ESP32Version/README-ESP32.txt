@@ -77,6 +77,9 @@ takes a step: souls in, power out.
 
 Any two elements mix (fire + ice = hot mist, fire + electric = plasma,
 ice + electric = storm); all three vaporize, with shock and mist at once.
+Each mix has a look of its own in her X: a pale cloud with the ember still
+in it, the violet bolt sheathed in flame, cold lightning with a crystal on
+it, and all three at once. One element on its own looks as it always did.
 Her hearts run purple at full, then blue, green, yellow, orange and red,
 and go black when there is nothing left.
 

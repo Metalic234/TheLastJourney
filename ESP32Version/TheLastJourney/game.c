@@ -938,28 +938,63 @@ static void draw_world(void) {
 
   draw_boss();
 
-  /* Her X wears whatever the peddler put in it: flame, a violet bolt, or the
-   * same white shard she started with. */
+  /* Her X wears whatever the peddler put in it: flame, a violet bolt, the
+   * same white shard she started with — and a look of its own once two or
+   * three elements are in it. */
   {
+    int xlook, n = power_count();
     uint16_t scol = to565(0x9FE8FF);
-    if (pw_fire) scol = to565(0xFF8A3C);
-    else if (pw_elec) scol = to565(0xC9A6FF);
-    else if (pw_ice) scol = to565(0xBFE6FF);
+    if (n >= 3) xlook = 7;                                   /* vapour */
+    else if (n == 2) xlook = (pw_fire && pw_ice) ? 4         /* mist */
+                          : (pw_fire ? 5 : 6);              /* plasma, storm */
+    else if (pw_fire) xlook = 1;
+    else if (pw_elec) xlook = 3;
+    else if (pw_ice) xlook = 2;
+    else xlook = 0;
+    if (xlook == 1) scol = to565(0xFF8A3C);
+    else if (xlook == 3) scol = to565(0xC9A6FF);
+    else if (xlook == 2) scol = to565(0xBFE6FF);
     for (i = 0; i < MAX_SHARDS; i++) {
       int sx, sy;
       if (!shards[i].live) continue;
       sx = (int)(shards[i].x - cam);
       sy = (int)shards[i].y;
-      if (pw_fire) {
+      if (xlook == 1) {
         /* a small ball of flame with its tail behind it */
         rect(sx - 3, sy, 3, 1, scol);
         px(sx, sy, to565(0xFFD166));
         px(sx + 1, sy, to565(0xFFF6D8));
-      } else if (pw_elec) {
+      } else if (xlook == 3) {
         /* a violet bolt, jagged end to end */
         px(sx, sy - 1, scol);
         px(sx + 1, sy, to565(0xF3E8FF));
         px(sx + 2, sy - 1, scol);
+      } else if (xlook == 4) {
+        /* hot mist: a soft pale cloud with the ember still in it */
+        px(sx - 4, sy, to565(0xCFC4C4));
+        rect(sx - 3, sy - 1, 2, 1, to565(0xDCE6EC));
+        px(sx, sy, to565(0xEFE6E0));
+        px(sx + 1, sy - 1, to565(0xFFFFFF));
+        px(sx + 1, sy + 1, to565(0xFF8A3C));
+      } else if (xlook == 5) {
+        /* plasma: the charge sheathed in flame */
+        rect(sx - 3, sy, 2, 1, to565(0xFF8A3C));
+        px(sx, sy - 1, to565(0xC9A6FF));
+        px(sx + 1, sy, to565(0xFFFFFF));
+        px(sx + 2, sy - 1, to565(0xC9A6FF));
+      } else if (xlook == 6) {
+        /* storm: cold lightning with a crystal riding on it */
+        px(sx, sy - 1, to565(0x5CC0FF));
+        px(sx + 1, sy, to565(0xEAFAFF));
+        px(sx + 2, sy - 1, to565(0x5CC0FF));
+        px(sx + 2, sy - 3, to565(0xDFF3FF));
+      } else if (xlook == 7) {
+        /* all three: the flame tail, the violet charge, the cold head */
+        rect(sx - 4, sy, 2, 1, to565(0xFF8A3C));
+        px(sx - 2, sy + 1, to565(0xDCE6EC));
+        px(sx, sy - 1, to565(0xC9A6FF));
+        px(sx + 1, sy, to565(0xFFFFFF));
+        px(sx + 2, sy - 1, to565(0xBFE6FF));
       } else {
         rect(sx, sy, 3, 1, to565(0xFFFFFF));
         px(sx - 2, sy, scol);

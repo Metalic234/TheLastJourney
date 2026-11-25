@@ -81,7 +81,8 @@ function makeVignette() {
 }
 
 // What her X looks like once the peddler's elements are in it: a fireball, a
-// purple bolt, or the same bright ice shard she started with.
+// purple bolt, or the same bright ice shard she started with — and, when two or
+// three elements are in it, a look of its own for the mix.
 function drawShardSprite(g, x, y, vx, vy, spin, look) {
   g.save();
   g.translate(Math.round(x), Math.round(y));
@@ -124,6 +125,149 @@ function drawShardSprite(g, x, y, vx, vy, spin, look) {
     g.lineTo(4, -1.6);
     g.lineTo(7, 0);
     g.stroke();
+  } else if (look === 'mist') {
+    // fire and ice at once: a scalding cloud, warm at the core, cold at the
+    // edges, with the ember still glowing inside it
+    g.globalAlpha = 0.3;
+    g.fillStyle = '#cfe4ff';
+    g.beginPath();
+    g.arc(-12, 1.4, 3.4, 0, TAU);
+    g.arc(-16, -1, 2.4, 0, TAU);
+    g.arc(-20, 1, 1.8, 0, TAU);
+    g.fill();
+    g.globalAlpha = 0.82;
+    g.fillStyle = '#cde2f4';
+    g.beginPath();
+    g.arc(-3.4, -1.6, 3.6, 0, TAU);
+    g.arc(1.8, 0.6, 3.2, 0, TAU);
+    g.arc(-1, 2.8, 2.6, 0, TAU);
+    g.arc(-5.4, 1.8, 2.4, 0, TAU);
+    g.fill();
+    g.globalAlpha = 1;
+    glow(g, 0, 0, 14, '#ffdcc8', 0.72);
+    g.fillStyle = '#ffffff';
+    g.beginPath();
+    g.arc(-0.2, -0.4, 2.0, 0, TAU);
+    g.fill();
+    g.fillStyle = '#ff9a4c';
+    g.beginPath();
+    g.arc(1.6, 1.8, 1.7, 0, TAU);
+    g.fill();
+    g.fillStyle = '#ffe6a8';
+    g.fillRect(1.2, 1.2, 1.6, 1.6);
+  } else if (look === 'plasma') {
+    // the charge sheathed in flame: an orange tail running into a violet bolt
+    g.globalAlpha = 0.38;
+    g.fillStyle = '#ff6a2c';
+    g.fillRect(-23, -2, 18, 4);
+    g.globalAlpha = 1;
+    glow(g, 0, 0, 16, '#ffb066', 0.62);
+    glow(g, 0, 0, 10, '#c9a6ff', 0.72);
+    g.strokeStyle = '#ff7a3c';
+    g.lineWidth = 4;
+    g.beginPath();
+    g.moveTo(-10, 0);
+    g.lineTo(-4, -3);
+    g.lineTo(0, 1);
+    g.lineTo(4, -2);
+    g.lineTo(10, 0);
+    g.stroke();
+    g.strokeStyle = '#c9a6ff';
+    g.lineWidth = 2.4;
+    g.beginPath();
+    g.moveTo(-9.5, 0);
+    g.lineTo(-4, -2.8);
+    g.lineTo(0, 1);
+    g.lineTo(4, -1.8);
+    g.lineTo(9.5, 0);
+    g.stroke();
+    g.strokeStyle = '#f3e8ff';
+    g.lineWidth = 1;
+    g.beginPath();
+    g.moveTo(-8, 0);
+    g.lineTo(-4, -2.4);
+    g.lineTo(0, 1);
+    g.lineTo(4, -1.4);
+    g.lineTo(8, 0);
+    g.stroke();
+    g.fillStyle = '#ffffff';
+    g.fillRect(9, -1.4, 2.4, 2.4);
+  } else if (look === 'storm') {
+    // ice carrying the charge: a cold blue bolt with crystals riding on it
+    glow(g, 0, 0, 14, '#8fd0ff', 0.82);
+    g.strokeStyle = '#5cc0ff';
+    g.lineWidth = 3;
+    g.beginPath();
+    g.moveTo(-9, 0);
+    g.lineTo(-5, -3);
+    g.lineTo(-1, 1);
+    g.lineTo(3, -2);
+    g.lineTo(9, 0);
+    g.stroke();
+    g.strokeStyle = '#eafaff';
+    g.lineWidth = 1.3;
+    g.beginPath();
+    g.moveTo(-8, 0);
+    g.lineTo(-5, -2.6);
+    g.lineTo(-1, 1);
+    g.lineTo(3, -1.6);
+    g.lineTo(8, 0);
+    g.stroke();
+    g.fillStyle = '#dff3ff';
+    g.beginPath();
+    g.moveTo(1, -9);
+    g.lineTo(3.8, -5.8);
+    g.lineTo(1, -2.8);
+    g.lineTo(-1.6, -5.8);
+    g.closePath();
+    g.fill();
+    g.fillStyle = '#bfe6ff';
+    g.beginPath();
+    g.moveTo(-13, 2);
+    g.lineTo(-11, 4.6);
+    g.lineTo(-9, 2);
+    g.lineTo(-11, -0.4);
+    g.closePath();
+    g.fill();
+  } else if (look === 'vapour') {
+    // all three at once: the flame tail, the violet charge, the cold head
+    g.globalAlpha = 0.4;
+    g.fillStyle = '#ff6a2c';
+    g.fillRect(-26, -2, 15, 4);
+    g.globalAlpha = 0.5;
+    g.fillStyle = '#d6e9ff';
+    g.beginPath();
+    g.arc(-17, 0.6, 5, 0, TAU);
+    g.fill();
+    g.globalAlpha = 1;
+    glow(g, 0, 0, 19, '#e8d8ff', 0.9);
+    g.strokeStyle = '#e3d0ff';
+    g.lineWidth = 1.4;
+    g.beginPath();
+    g.moveTo(-11, 0);
+    g.lineTo(-5, -3.2);
+    g.lineTo(0, 1);
+    g.lineTo(5, -2.4);
+    g.lineTo(9, 0);
+    g.stroke();
+    g.fillStyle = '#c9a6ff';
+    g.beginPath();
+    g.moveTo(-8, -2.2);
+    g.lineTo(-5.4, -4.4);
+    g.lineTo(-3, -2.4);
+    g.lineTo(-5.4, -0.4);
+    g.closePath();
+    g.fill();
+    g.fillStyle = '#eaf7ff';
+    g.beginPath();
+    g.moveTo(11, 0);
+    g.lineTo(8.4, -3);
+    g.lineTo(5.6, 0);
+    g.lineTo(8.4, 3);
+    g.closePath();
+    g.fill();
+    g.fillStyle = '#8fd0ff';
+    g.fillRect(7, -0.8, 2, 1.8);
   } else {
     // the ice shard: cold, white, and unchanged
     glow(g, 0, 0, 12, '#dff3ff', 0.6);
@@ -943,21 +1087,30 @@ export class Game {
     return 1 + bite + mix;
   }
 
-  // Fire wins the look, then the charge, then the cold: one X, one element.
+  // One X, one look. A single element has its own, and every mix has one too:
+  // the steam of fire and ice, the charge under flame, or cold lightning.
   shardLook() {
     const powers = this.elementPowers();
+    if (powers.length === 3) return 'vapour';
+    if (powers.length === 2) {
+      if (powers.includes('fire') && powers.includes('ice')) return 'mist';
+      return powers.includes('fire') ? 'plasma' : 'storm';
+    }
     if (powers.includes('fire')) return 'fire';
     if (powers.includes('elec')) return 'elec';
     if (powers.includes('ice')) return 'ice';
     return 'plain';
   }
 
-  // Each element throws its own sound: flame, a shock, breaking glass.
+  // Each element throws its own sound — flame, a shock, breaking glass — and a
+  // mix takes the sharper half of the two it is made of.
   shardSound() {
     const look = this.shardLook();
-    if (look === 'fire') return 'fireCast';
-    if (look === 'elec') return 'elecCast';
+    if (look === 'fire' || look === 'mist') return 'fireCast';
     if (look === 'ice') return 'iceCast';
+    if (look === 'elec' || look === 'plasma' || look === 'storm' || look === 'vapour') {
+      return 'elecCast';
+    }
     return 'shardCast';
   }
 
