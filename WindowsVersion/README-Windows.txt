@@ -1,5 +1,18 @@
-THE LAST JOURNEY — Windows Edition (v2.2.7)
+THE LAST JOURNEY — Windows Edition (v2.2.8)
 ===========================================
+
+WHAT'S NEW IN v2.2.8
+---------------------
+- HER X REACHES THE FOUR OF THEM. On the last street the road behind her
+  was still fighting: the village's own foes kept the frame, and every X
+  was spent on that empty road before the duel ever saw it. Neither Blue
+  nor Brown could be touched. The road's fight now ends where the road
+  ends, and X, C and the two knights answer all four of them as they
+  always should have.
+- RESTART THIS ROAD KNOWS WHICH STREET IT IS ON. Pausing on the last street
+  sent her back to the village, and pausing on the village sent her into
+  the last fight. It restarts the road she is actually standing on now; on
+  the last street it replays the fight.
 
 WHAT'S NEW IN v2.2.7
 ---------------------

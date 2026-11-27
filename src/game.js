@@ -597,7 +597,12 @@ export class Game {
     this.paused = false;
     this.pauseIndex = 0;
     // The last street is a scene, not a road: there the fight is retried.
-    if (this.level && this.level.finale) this.retryFinale();
+    // The finale flag lives on the village road that leads to it, so asking
+    // the level alone answers the wrong question — it sent a pause on the last
+    // street back to the village, and a pause on the village into the fight.
+    const inLastStreet = !!this.bossBattle || !!this.finale
+      || (!!this.cityScene && this.level === this.cityScene);
+    if (inLastStreet) this.retryFinale();
     else this.retryStage();
   }
 
@@ -1567,6 +1572,16 @@ export class Game {
     this.frozen = true;
     this.nearby = null;
     this.card = null;
+    // The road behind her is finished: its foes do not walk into the last
+    // street with her. Left standing, that fight kept reading X first every
+    // frame and spending the press on an empty road, so the four of them could
+    // not be touched at all.
+    if (this.combat) {
+      this.lifeHP = this.combat.hp;
+      this.shieldHP = this.combat.shield;
+      this.combat = null;
+      this.audio.setBeam(false);
+    }
     this.audio.play('transition');
     // The city is no longer walked: the last street is a scene she arrives in.
     if (!this.cityScene) this.cityScene = buildCityScene();
