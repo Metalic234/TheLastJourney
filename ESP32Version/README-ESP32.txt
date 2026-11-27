@@ -29,6 +29,15 @@ CONTROLS
   Collect all four memories on a road, then reach its end to continue.
   Falling into a gap costs the whole run of that road.
 
+  LEFT + RIGHT       open the menu. It holds RESUME, RESTART THIS ROAD and
+                     BEGIN AGAIN, which is what a title screen would do:
+                     a road restarts from its first step with her breath
+                     whole and everything she has bought still hers, and
+                     the stall waiting at the start of it. There is no
+                     sound on this board, so there is no SOUND row.
+                     In the menu LEFT / RIGHT choose, C takes the row and
+                     JUMP steps back out.
+
 THE KEEPERS
 -----------
 The last two roads end in a fight. The keeper holds the end of the road

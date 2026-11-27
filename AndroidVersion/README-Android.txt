@@ -1,5 +1,26 @@
-THE LAST JOURNEY — Android Edition (v2.2.6)
+THE LAST JOURNEY — Android Edition (v2.2.7)
 ============================================
+
+WHAT'S NEW IN v2.2.7
+---------------------
+- PAUSE IS A MENU. ESC or P used to freeze the game under one line of text,
+  and the only thing on offer was to begin the journey again. The pause
+  screen is a window now: RESUME, RESTART THIS ROAD, SOUND, QUIT TO THE
+  TITLE. Choose with W/S or the arrows, take a row with E, step back out
+  with ESC. R still restarts the road outright.
+- RESTART THIS ROAD. A fight that had gone wrong on the dragon's bridge
+  cost the whole stage, so the only way out was to replay it from the first
+  cliff. The menu puts her back at the first step of the road she is
+  standing on, her breath whole, and keeps everything the road cannot take:
+  her souls, her elements, her guardian, her ward. The peddler's stall is
+  waiting at the start of it, as it is at the start of every road. The last
+  street restarts the fight itself, the way dying there always did.
+- QUIT TO THE TITLE. Leaving a run no longer means reloading the page. The
+  journey is let go whole — souls, powers, wares, the voyage — and the
+  title comes back over the first road.
+- THE SOUND ROW SHOWS WHICH WAY IT IS, and on a phone the buttons already
+  on screen drive all of it: the arrows choose, E takes the row, and the
+  restart button beside the music note restarts the road.
 
 WHAT'S NEW IN v2.2.6
 ---------------------

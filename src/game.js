@@ -321,6 +321,7 @@ export class Game {
     this.card = null;
     this.hintT = 0;
     this.paused = false;
+    this.pauseIndex = 0;
     this.fade = 0;
     this.fadeTarget = 0;
     this.frozen = true;
@@ -519,6 +520,123 @@ export class Game {
     this.beginFinale();
   }
 
+  // ------------------------------------------------------------- the menu
+  // The pause screen is a real menu. The one that matters is RESTART THIS
+  // ROAD: a dragon fight that has gone wrong used to cost the whole stage,
+  // and there is no way back to the title short of reloading the page.
+  // The row list lives in one place so the draw and the input agree.
+  pauseRows() {
+    return [
+      { id: 'resume', label: 'RESUME' },
+      { id: 'restart', label: 'RESTART THIS ROAD' },
+      { id: 'sound', label: 'SOUND', value: this.audio.muted ? 'OFF' : 'ON' },
+      { id: 'quit', label: 'QUIT TO THE TITLE' },
+    ];
+  }
+
+  openPause() {
+    this.paused = true;
+    this.pauseIndex = 0;
+    this.audio.setBeam(false);
+    this.audio.play('whisper');
+  }
+
+  resumeRoad() {
+    this.paused = false;
+    this.audio.play('whisper');
+  }
+
+  toggleSound() {
+    const m = this.audio.toggleMute();
+    this.mutedNotice = 2.2;
+    if (!m) this.audio.play('whisper');
+    return m;
+  }
+
+  updatePause() {
+    const rows = this.pauseRows();
+    const n = rows.length;
+    this.pauseIndex = clamp(this.pauseIndex || 0, 0, n - 1);
+
+    if (this.input.pressed('up') || this.input.pressed('left')) {
+      this.pauseIndex = (this.pauseIndex + n - 1) % n;
+      this.audio.play('step');
+    }
+    if (this.input.pressed('down') || this.input.pressed('right')) {
+      this.pauseIndex = (this.pauseIndex + 1) % n;
+      this.audio.play('step');
+    }
+
+    // R used to begin the whole journey again. It restarts this road now,
+    // because that is the thing she actually wants out of a bad fight.
+    if (this.input.consume('restart')) {
+      this.restartRoad();
+      return;
+    }
+    if (!this.input.consume('interact')) return;
+
+    switch (rows[this.pauseIndex].id) {
+      case 'resume':
+        this.resumeRoad();
+        break;
+      case 'restart':
+        this.restartRoad();
+        break;
+      case 'sound':
+        this.toggleSound();
+        break;
+      default:
+        this.quitToTitle();
+        break;
+    }
+  }
+
+  // Back to the start of the road she is standing on, with her breath whole
+  // and everything else — souls, powers, ward — left exactly as it was.
+  restartRoad() {
+    this.paused = false;
+    this.pauseIndex = 0;
+    // The last street is a scene, not a road: there the fight is retried.
+    if (this.level && this.level.finale) this.retryFinale();
+    else this.retryStage();
+  }
+
+  // Out of the run entirely. startGame() resets the journey itself; this
+  // clears what belongs to it so the title screen is honest about the state.
+  quitToTitle() {
+    this.paused = false;
+    this.pauseIndex = 0;
+    this.mode = 'title';
+    this.ending = null;
+    this.finale = null;
+    this.bossBattle = null;
+    this.combat = null;
+    this.voyage = null;
+    this.shop = null;
+    this.shopNear = false;
+    this.shopGiven = false;
+    this.note = null;
+    this.card = null;
+    this.lookout = null;
+    this.cityScene = null;
+    this.timeline = null;
+    this.memorySurge = null;
+    this.whale = null;
+    this.whaleDone = false;
+    this.dolphins = [];
+    this.dolphinBridgesDone.clear();
+    this.lookedOut = false;
+    this.climbEpilogue = false;
+    this.storyMetal = false;
+    this.frozen = true;
+    this.fade = 1;
+    this.fadeTarget = 0;
+    this.loadTitleScene();
+    this.audio.setBeam(false);
+    this.audio.applyBiome('forest');
+    this.audio.play('whisper');
+  }
+
   // ---------------------------------------------------------------- loop
   start() {
     this.last = performance.now();
@@ -550,11 +668,7 @@ export class Game {
     }
     this.updateTimeline(dt);
 
-    if (this.input.consume('mute')) {
-      const m = this.audio.toggleMute();
-      this.mutedNotice = 2.2;
-      if (!m) this.audio.play('whisper');
-    }
+    if (this.input.consume('mute')) this.toggleSound();
 
     if (this.mode === 'title') {
       this.titleT += dt;
@@ -590,13 +704,14 @@ export class Game {
       return;
     }
 
+    // ESC / P is the door in and out of the menu, and the touch overlay's
+    // pause button drives the same action.
     if (this.input.consume('pause')) {
-      this.paused = !this.paused;
-      this.audio.setBeam(false);
-      this.audio.play('whisper');
+      if (this.paused) this.resumeRoad();
+      else this.openPause();
     }
     if (this.paused) {
-      if (this.input.pressed('restart')) this.startGame();
+      this.updatePause();
       return;
     }
 
@@ -5964,13 +6079,71 @@ export class Game {
   }
 
   drawPause(g) {
+    const rows = this.pauseRows();
+    const px = 132;
+    const py = 54;
+    const pw = W - 264;
+    const ph = 170;
+    const top = py + 50;
+    const rowH = 22;
+
     g.save();
-    g.fillStyle = 'rgba(3,3,7,0.72)';
+    g.fillStyle = 'rgba(3,3,7,0.78)';
     g.fillRect(0, 0, W, H);
-    drawText(g, 'PAUSED', W / 2, 110, { align: 'center', color: '#e6e0f0', scale: 2, spacing: 3 });
-    drawText(g, 'ESC  RESUME        M  SOUND        R  BEGIN AGAIN', W / 2, 138, {
-      align: 'center', color: '#8d869f', scale: 1, spacing: 1,
+
+    g.fillStyle = 'rgba(20,15,28,0.96)';
+    g.fillRect(px, py, pw, ph);
+    g.fillStyle = 'rgba(190,170,220,0.32)';
+    g.fillRect(px, py, pw, 1);
+    g.fillRect(px, py + ph - 1, pw, 1);
+    g.fillRect(px, py, 1, ph);
+    g.fillRect(px + pw - 1, py, 1, ph);
+
+    drawText(g, 'PAUSED', W / 2, py + 9, {
+      align: 'center', color: '#efe6f4', scale: 2, spacing: 3, shadow: '#000000',
     });
+    // Where she is, so it is plain what RESTART THIS ROAD will restart.
+    drawText(g, this.level ? this.level.name : 'THE ROAD WAITS', W / 2, py + 29, {
+      align: 'center', color: '#9089a2', scale: 1, spacing: 1,
+    });
+
+    for (let i = 0; i < rows.length; i++) {
+      const y = top + i * rowH;
+      const sel = i === this.pauseIndex;
+
+      if (sel) {
+        g.fillStyle = 'rgba(150,120,190,0.22)';
+        g.fillRect(px + 8, y - 6, pw - 16, rowH - 4);
+        // the pixel font has no arrow: draw the marker
+        g.fillStyle = '#ffd9a0';
+        g.beginPath();
+        g.moveTo(px + 15, y - 1);
+        g.lineTo(px + 15, y + 4);
+        g.lineTo(px + 20, y + 1.5);
+        g.closePath();
+        g.fill();
+      }
+
+      drawText(g, rows[i].label, px + 26, y, {
+        color: sel ? '#ffffff' : '#b9b2c8', scale: 1, spacing: 1,
+      });
+      if (rows[i].value) {
+        drawText(g, rows[i].value, px + pw - 14, y, {
+          align: 'right',
+          color: rows[i].value === 'OFF' ? '#8a8296' : '#ffd9a0',
+          scale: 1,
+        });
+      }
+    }
+
+    // Phones have no Escape: the overlay's arrows and E drive the same rows.
+    const touch = typeof window !== 'undefined' && !!window.__touchButtons;
+    drawText(
+      g,
+      touch ? 'ARROWS CHOOSE     E  CHOOSE' : 'W S CHOOSE     E  CHOOSE     ESC  BACK',
+      W / 2, py + ph - 10,
+      { align: 'center', color: '#8d869f', scale: 1, spacing: 1 },
+    );
     g.restore();
   }
 

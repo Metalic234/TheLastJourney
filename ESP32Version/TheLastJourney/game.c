@@ -134,7 +134,8 @@ typedef struct {
 static Boss boss;
 
 static float cam;
-static int state; /* 0 play, 1 clear, 2 dead, 3 end, 4 shop */
+static int state; /* 0 play, 1 clear, 2 dead, 3 end, 4 shop, 5 menu */
+static int pause_sel;
 static float state_t;
 static float banner;
 static int finished;
@@ -1155,6 +1156,7 @@ static void draw_hud(void) {
     if (stage_i == 0 && banner > 1.2f) {
       text_center("LEFT RIGHT MOVE   X JUMP   C SHARD", H - 22, 1, to565(0xB8C4D0));
       text_center("HOLD C TO RUN - IT SPENDS HER BREATH", H - 12, 1, to565(0x8D869F));
+      text_center("LEFT+RIGHT: THE MENU", H - 32, 1, to565(0x8D869F));
     }
   }
 
@@ -1191,20 +1193,25 @@ static void cost_str(char *b, int cost) {
   b[i] = 0;
 }
 
-static void draw_shop(void) {
-  char buf[16];
-  int i, y;
-
-  /* dim the road behind the window */
+/* Half-brightness copy of the road, so a window can be read over it. */
+static void dim_screen(void) {
+  int i, x;
   for (i = 0; i < H; i++) {
     uint16_t *row = &fb[i * W];
-    int x;
     for (x = 0; x < W; x++) {
       uint16_t c = row[x];
       int r = (c >> 11) & 0x1F, g = (c >> 5) & 0x3F, b = c & 0x1F;
       row[x] = (uint16_t)(((r >> 1) << 11) | ((g >> 1) << 5) | (b >> 1));
     }
   }
+}
+
+static void draw_shop(void) {
+  char buf[16];
+  int i, y;
+
+  /* dim the road behind the window */
+  dim_screen();
 
   rect(24, 8, W - 48, H - 16, to565(0x161220));
   rect(24, 8, W - 48, 1, to565(0x8E7FB0));
@@ -1264,6 +1271,63 @@ static void draw_shop(void) {
   }
 }
 
+/* ---- the pause menu ---------------------------------------------------- */
+/* Four buttons have no room for a fifth, so both directions at once opens
+ * this. It holds the two things a bad fight needs: the same road, from its
+ * beginning, and the whole journey, from its first. There is no sound here,
+ * so the desktop menu's SOUND row has nothing to do on this board. */
+#define PAUSE_ROWS 3
+static const char *PAUSE_NAME[PAUSE_ROWS] = {
+  "RESUME", "RESTART THIS ROAD", "BEGIN AGAIN",
+};
+
+static void draw_pause(void) {
+  int i, y;
+
+  dim_screen();
+  rect(64, 34, W - 128, 112, to565(0x161220));
+  rect(64, 34, W - 128, 1, to565(0x8E7FB0));
+  rect(64, 145, W - 128, 1, to565(0x8E7FB0));
+  rect(64, 34, 1, 112, to565(0x8E7FB0));
+  rect(W - 65, 34, 1, 112, to565(0x8E7FB0));
+
+  text_center("PAUSED", 42, 2, to565(0xF0ECDC));
+  text_center(STAGES[stage_i].name, 60, 1, to565(0x9089A2));
+
+  for (i = 0; i < PAUSE_ROWS; i++) {
+    y = 76 + i * 15;
+    if (i == pause_sel) {
+      rect(70, y - 3, W - 140, 11, to565(0x2A2140));
+      px(72, y + 1, to565(0xFFD9A0));
+      px(72, y + 2, to565(0xFFD9A0));
+      px(73, y + 2, to565(0xFFD9A0));
+      px(72, y + 3, to565(0xFFD9A0));
+    }
+    text(PAUSE_NAME[i], 80, y, 1, i == pause_sel ? to565(0xFFFFFF) : to565(0xB9B2C8));
+  }
+
+  text_center("LEFT RIGHT CHOOSE   C GO   X BACK", 130, 1, to565(0x8D869F));
+  text_center("LEFT RIGHT CHOOSE   C GO   X BACK", H - 12, 1, to565(0x8D869F));
+}
+
+static void update_pause(int left_pressed, int right_pressed, int jump_pressed, int action_pressed) {
+  if (left_pressed) pause_sel = (pause_sel + PAUSE_ROWS - 1) % PAUSE_ROWS;
+  if (right_pressed) pause_sel = (pause_sel + 1) % PAUSE_ROWS;
+  if (jump_pressed) { state = 0; return; }
+  if (!action_pressed) return;
+
+  if (pause_sel == 0) {
+    state = 0;
+  } else if (pause_sel == 1) {
+    /* The road again from its first step, her breath whole, and everything
+     * she has bought still hers — the stall is waiting at the start of it. */
+    p.hp = max_hp;
+    reset_stage(stage_i);
+  } else {
+    game_init();
+  }
+}
+
 /* ---- public API -------------------------------------------------------- */
 void game_update(float dt, GameInput in) {
   static GameInput prev;
@@ -1271,6 +1335,8 @@ void game_update(float dt, GameInput in) {
   int action_pressed = in.action && !prev.action;
   int left_pressed = in.left && !prev.left;
   int right_pressed = in.right && !prev.right;
+  /* both directions at once: the way into the menu */
+  int menu_pressed = in.left && in.right && !(prev.left && prev.right);
   prev = in;
 
   if (dt <= 0) dt = 0.016f;
@@ -1295,13 +1361,21 @@ void game_update(float dt, GameInput in) {
     }
   } else if (state == 3) {
     if (action_pressed) { finished = 0; reset_stage(0); }
+  } else if (state == 5) {
+    update_pause(left_pressed, right_pressed, jump_pressed, action_pressed);
   } else {
-    update_play(dt, in, jump_pressed, action_pressed);
+    if (menu_pressed) {
+      state = 5;
+      pause_sel = 0;
+    } else {
+      update_play(dt, in, jump_pressed, action_pressed);
+    }
   }
 
   draw_world();
   draw_hud();
   if (state == 4) draw_shop();
+  else if (state == 5) draw_pause();
 }
 
 const uint16_t *game_framebuffer(void) { return fb; }
