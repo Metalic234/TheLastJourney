@@ -1,5 +1,22 @@
-THE LAST JOURNEY — Android Edition (v2.2.8)
+THE LAST JOURNEY — Android Edition (v2.2.9)
 ============================================
+
+WHAT'S NEW IN v2.2.9
+---------------------
+- TWO THUMBS, TWO JOBS. The glass used to be one row of keys crowded into
+  the right corner, with the walking pad stranded by itself on the left.
+  Walking, running and jumping are the left thumb's now — a wide JUMP bar
+  over the two arrows, with RUN beside them — and everything a fight needs
+  sits under the right thumb.
+- EVERY BUTTON SAYS WHAT IT IS. SHARD, BEAM, USE, JUMP and RUN are printed
+  under the glyphs, so nobody has to guess at a letter.
+- THE KEYS LOOK LIKE KEYS. Rounded, lit glass with its own colour per
+  action — blue to walk, green to jump, amber to run, violet for X, cyan
+  for C, gold for E — a pressed state that sinks and glows, and a soft
+  drop shadow so they read against any road.
+- X AND C ONLY APPEAR IN A FIGHT. On a quiet road the glass carries
+  movement, USE and the system keys; the shard and the beam come back for
+  the keepers, the dragon and the four of them.
 
 WHAT'S NEW IN v2.2.8
 ---------------------
@@ -358,16 +375,18 @@ This build: versionName 1.6, versionCode 7, package com.zai.lastjourney.
 
 HOW TO PLAY ON TOUCH
 --------------------
-The game auto-scales to your screen in landscape. On-screen controls:
+The game auto-scales to your screen in landscape. The controls are split by
+hand:
 
-  Bottom-left:   <  >   walk left / right
-  Bottom-right:  ^      jump (hold in mid-air to GLIDE once learned)
-                 E      interact / talk / collect / continue
-                 >>     dash         (appears once unlocked)
-                 *      white shards (appears once unlocked)
-                 ~      light beam   (hold; appears once unlocked)
-  Top-right:     ||     pause        (RESTART button appears while paused)
-                 note   mute / unmute
+  Bottom-left:   ^  JUMP    a wide bar over both directions
+                          (hold in mid-air to GLIDE once learned)
+                 <  >      walk left / right
+                 >> RUN    hold to sprint, tap to dash once learned
+  Bottom-right:  C  BEAM   hold for the knights' light (in a fight)
+                 X  SHARD  throw the volley (in a fight)
+                 E  USE    interact / talk / collect / continue / choose
+  Top-right:     ||        pause (the RESTART button appears while paused)
+                 note      mute / unmute
 
 - Title screen: tap anywhere to begin.
 - Text notes: tap E to skip typing, tap E again to close.
