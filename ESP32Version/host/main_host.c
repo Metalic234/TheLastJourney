@@ -41,14 +41,14 @@ int main(int argc, char **argv) {
   int shop_frames = 0;
   int shop_visits = 0;
   int in_shop = 0; /* the run starts at the stall */
-  int hp_at_stage[3] = { 0, 0, 0 };
+  int hp_at_stage[4] = { 0, 0, 0, 0 };
   int seen_stage = -1;
-  int boss_kind[3] = { 0, 0, 0 };
-  int boss_hp[3] = { 0, 0, 0 };
+  int boss_kind[4] = { 0, 0, 0, 0 };
+  int boss_hp[4] = { 0, 0, 0, 0 };
 
   game_init();
 
-  for (f = 0; f < 12000; f++) {
+  for (f = 0; f < 20000; f++) {
     GameInput in;
     memset(&in, 0, sizeof(in));
 
@@ -137,7 +137,8 @@ int main(int argc, char **argv) {
     boss_kind[seen_stage] = game_boss_kind();
     boss_hp[seen_stage] = game_boss_hp();
   }
-  printf("bosses: stage1 kind %d hp %d, stage2 kind %d hp %d\n",
-         boss_kind[1], boss_hp[1], boss_kind[2], boss_hp[2]);
+  printf("bosses: stage1 kind %d hp %d, stage2 kind %d hp %d, stage3 kind %d hp %d\n",
+         boss_kind[1], boss_hp[1], boss_kind[2], boss_hp[2],
+         boss_kind[3], boss_hp[3]);
   return 0;
 }

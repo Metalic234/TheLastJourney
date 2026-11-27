@@ -3,7 +3,7 @@
  *
  * A small, self-contained C port of the game for microcontrollers with a
  * colour TFT (ESP32 and friends). It keeps the shape of the story: run the
- * three roads, gather the memories, and reach the end. Rendering goes to a
+ * four roads, gather the memories, and reach the end. Rendering goes to a
  * 320x180 RGB565 framebuffer that is pushed to the display once per frame.
  *
  * No dynamic allocation, no floating point display code, no libc drawing.
@@ -19,6 +19,8 @@
 #define MAX_SPIDERS 10
 #define MAX_SHARDS 10
 #define MAX_MEM 4
+#define MAX_ARROWS 8
+#define MAX_CLONES 2
 #define GND_STEP 2
 #define GND_MAX 1600
 
@@ -44,7 +46,7 @@ typedef struct {
   float bridge_x0, bridge_x1;
 } StageCfg;
 
-static const StageCfg STAGES[3] = {
+static const StageCfg STAGES[4] = {
   {
     "THE ENCHANTED FOREST", 2100.0f, 2,
     { { 640, 686 }, { 1080, 1126 } },
@@ -62,6 +64,14 @@ static const StageCfg STAGES[3] = {
     { { 430, 476 }, { 760, 806 }, { 1150, 1196 }, { 1560, 1606 } },
     0x160B10, 0x8A3A26, 0x24161A, 0x3B2020, 0x2A1A18, 0x8A4A2A, 0x140C0A,
     2050.0f, 2270.0f
+  },
+  {
+    /* The forest past the cliffs: a green roof, two green walls of trees and
+     * a road of living bushes. It is the longest road of the four. */
+    "THE VERDANT WILDS", 2900.0f, 3,
+    { { 700, 748 }, { 1240, 1288 }, { 1980, 2028 } },
+    0x08261A, 0x6FCB6A, 0x123A1E, 0x1E5A2C, 0x2A1C12, 0x4FE060, 0x16200E,
+    0.0f, 0.0f
   },
 };
 
@@ -113,12 +123,12 @@ static int mem_n, mem_taken;
 static Shard shards[MAX_SHARDS];
 
 /* ---- the two keepers -------------------------------------------------- */
-/* Stage one ends with the tiger of the ruins, the last road with the water
- * dragon. 0 = no boss on the road. */
-static const int BOSS_KIND[3] = { 0, 1, 2 };
+/* Stage one ends with the tiger of the ruins, the third road with the water
+ * dragon, and the wilds with the Forest Fairy. 0 = no boss on the road. */
+static const int BOSS_KIND[4] = { 0, 1, 2, 3 };
 
 typedef struct {
-  int kind;              /* 1 tiger, 2 dragon */
+  int kind;              /* 1 tiger, 2 dragon, 3 fairy */
   float x, home, base_y;
   /* damage is paid in fractions now: her X powers bite by percentages */
   float hp, max_hp;
@@ -129,9 +139,33 @@ typedef struct {
   float burn_t, ice_t, shock_t;
   int hops;
   float flash;
+  /* the Forest Fairy's own weather */
+  float rain_t;
+  int rot;               /* which of her three powers comes next */
 } Boss;
 
 static Boss boss;
+
+/* ---- the Forest Fairy's weather --------------------------------------- */
+/* Eight falling arrows, one rolling fireball and two shadow clones are all
+ * the wilds need: 8 * 12 + 20 + 2 * 12 = 140 bytes of state. */
+typedef struct {
+  float x, y, vy;
+  int live;
+} Arrow;
+
+typedef struct {
+  float x, y, vx, life;
+  int live;
+} Fireball;
+
+typedef struct {
+  float x, life, fire_cd;
+} Clone;
+
+static Arrow arrows[MAX_ARROWS];
+static Fireball fball;
+static Clone clones[MAX_CLONES];
 
 static float cam;
 static int state; /* 0 play, 1 clear, 2 dead, 3 end, 4 shop, 5 menu */
@@ -205,6 +239,7 @@ static int roll_souls(void) {
 /* ---- helpers ----------------------------------------------------------- */
 static void mem_str(char *b, int n);
 static void draw_boss(void);
+static void clear_weather(void);
 
 static float clampf(float v, float a, float b) {
   return v < a ? a : (v > b ? b : v);
@@ -450,9 +485,11 @@ static void reset_stage(int idx) {
     }
   }
   for (i = 0; i < MAX_SHARDS; i++) shards[i].live = 0;
+  clear_weather();
 
   boss.kind = BOSS_KIND[idx];
-  boss.max_hp = boss.kind ? 9.0f : 0.0f;
+  /* The fairy is the longest fight of the four: her wood fights for her. */
+  boss.max_hp = boss.kind == 3 ? 12.0f : (boss.kind ? 9.0f : 0.0f);
   boss.hp = boss.max_hp;
   boss.alive = boss.kind ? 1 : 0;
   boss.active = 0;
@@ -479,6 +516,8 @@ static void reset_stage(int idx) {
   boss.burn_t = 0.0f;
   boss.ice_t = 0.0f;
   boss.shock_t = 0.0f;
+  boss.rain_t = 0.0f;
+  boss.rot = 0;
   /* The ward is spent, not mended: a road that finds it used leaves it used. */
 
   cam = 0;
@@ -558,7 +597,64 @@ static void shoot(void) {
 static void boss_die(void) {
   boss.hp = 0.0f;
   boss.alive = 0;
+  clear_weather();
   souls += roll_souls();
+}
+
+/* ---- the fairy's weather ----------------------------------------------- */
+static void clear_weather(void) {
+  int i;
+  for (i = 0; i < MAX_ARROWS; i++) arrows[i].live = 0;
+  for (i = 0; i < MAX_CLONES; i++) clones[i].life = 0.0f;
+  fball.live = 0;
+}
+
+/* Poisoned arrows fall where she stands, the fireball rolls along the ground
+ * and the clones loose an arrow whenever they are ready. */
+static void update_weather(float dt) {
+  int i;
+  for (i = 0; i < MAX_ARROWS; i++) {
+    Arrow *a = &arrows[i];
+    if (!a->live) continue;
+    a->y += a->vy * dt;
+    if (p.invuln <= 0.0f && fabsf(p.x - a->x) < 7.0f
+        && a->y > p.y - 20.0f && a->y < p.y + 2.0f) {
+      a->live = 0;
+      hurt(1);
+      continue;
+    }
+    if (a->y > ground_y(a->x) + 2.0f || a->y > (float)H + 8.0f) a->live = 0;
+  }
+  if (fball.live) {
+    fball.x += fball.vx * dt;
+    fball.life -= dt;
+    fball.y = ground_y(fball.x) - 8.0f;
+    if (p.invuln <= 0.0f && fabsf(p.x - fball.x) < 11.0f && p.y > fball.y - 6.0f) {
+      hurt(1);
+      fball.live = 0;
+    } else if (fball.life <= 0.0f || fball.x < 8.0f || fball.x > stage_len - 8.0f
+               || ground_y(fball.x) > 300.0f) {
+      fball.live = 0;
+    }
+  }
+  for (i = 0; i < MAX_CLONES; i++) {
+    Clone *c = &clones[i];
+    if (c->life <= 0.0f) continue;
+    c->life -= dt;
+    c->fire_cd -= dt;
+    if (c->fire_cd <= 0.0f) {
+      int k;
+      for (k = 0; k < MAX_ARROWS; k++) {
+        if (arrows[k].live) continue;
+        arrows[k].x = c->x;
+        arrows[k].y = ground_y(c->x) - 34.0f;
+        arrows[k].vy = 150.0f;
+        arrows[k].live = 1;
+        break;
+      }
+      c->fire_cd = 1.4f;
+    }
+  }
 }
 
 static void update_boss(float dt) {
@@ -589,6 +685,7 @@ static void update_boss(float dt) {
   if (boss.intro > 0.0f) { boss.intro -= dt; return; }
   boss.facing = (p.x < boss.x) ? -1 : 1;
   ad = fabsf(p.x - boss.x);
+  if (boss.kind == 3) update_weather(dt);
 
   if (boss.kind == 1) {
     /* the tiger: closes the gap on two legs, swipes, and leaps at her mark */
@@ -615,6 +712,47 @@ static void update_boss(float dt) {
       if (ad < 62.0f) boss.claw_t = 0.4f;
       else { boss.pounce_t = 0.5f; boss.pounce_x = p.x; }
       boss.cd = 1.5f;
+    }
+  } else if (boss.kind == 3) {
+    /* the Forest Fairy: she hovers out of reach and lets the wood fight for
+     * her — poisoned arrows out of the canopy, a fireball that rolls the
+     * ground, and two shadow clones that shoot while she hides among them */
+    int i;
+    boss.lift = 12.0f + sinf(boss.bob * 3.0f) * 2.0f;
+    if (boss.rain_t > 0.0f) boss.rain_t -= sdt;
+    if (ad > 112.0f) boss.x += (p.x > boss.x ? 1.0f : -1.0f) * 24.0f * sdt;
+    else if (ad < 68.0f) boss.x -= (p.x > boss.x ? 1.0f : -1.0f) * 20.0f * sdt;
+    boss.x = clampf(boss.x, boss.home - 90.0f, boss.home + 90.0f);
+    boss.cd -= sdt;
+    if (boss.cd <= 0.0f) {
+      if (boss.rot == 0) {
+        /* the rain of poisoned arrows: six of them strung over her mark */
+        for (i = 0; i < MAX_ARROWS; i++) {
+          arrows[i].x = clampf(p.x - 30.0f + (float)i * 12.0f, 12.0f, stage_len - 12.0f);
+          arrows[i].y = 14.0f - (float)(i & 1) * 6.0f;
+          arrows[i].vy = 128.0f + (float)(i & 1) * 16.0f;
+          arrows[i].live = 1;
+        }
+        boss.rain_t = 1.1f;
+        boss.cd = 2.3f;
+      } else if (boss.rot == 1) {
+        /* the fireball: it rolls low, so a jump clears it */
+        fball.x = boss.x + (p.x > boss.x ? 10.0f : -10.0f);
+        fball.y = ground_y(fball.x) - 8.0f;
+        fball.vx = (p.x > boss.x ? 1.0f : -1.0f) * 92.0f;
+        fball.life = 4.0f;
+        fball.live = 1;
+        boss.cd = 2.4f;
+      } else {
+        /* the shadow clones: only one of the three is real */
+        for (i = 0; i < MAX_CLONES; i++) {
+          clones[i].x = clampf(boss.x + (i == 0 ? -34.0f : 34.0f), 14.0f, stage_len - 14.0f);
+          clones[i].life = 6.5f;
+          clones[i].fire_cd = 0.5f + (float)i * 0.35f;
+        }
+        boss.cd = 2.6f;
+      }
+      boss.rot = (boss.rot + 1) % 3;
     }
   } else {
     /* the water dragon: leaps from the sea on one side of the bridge into the
@@ -858,6 +996,62 @@ static void update_play(float dt, GameInput in, int jump_pressed, int action_pre
 }
 
 /* ---- drawing ----------------------------------------------------------- */
+/* The wilds wear their green above the road as well: a scalloped canopy, tall
+ * trunks behind the walk, and bushes, flowers and giant carnivore plants on
+ * it. Everything here is a few dozen short runs, so the frame stays cheap. */
+static void draw_jungle_back(void) {
+  int x, tx;
+  float off = fmodf(cam * 0.6f, 96.0f);
+
+  for (x = 0; x < W; x++) {
+    int h = 12 + (int)(sinf((cam + x) * 0.05f) * 4.0f)
+                + (int)(sinf((cam + x) * 0.13f + 1.7f) * 3.0f);
+    rect(x, 0, 1, h, to565(0x0B3320));
+    px(x, h, to565(0x1E6A34));
+  }
+
+  for (tx = -(int)off; tx < W + 96; tx += 96) {
+    int gy = 128 - hill_near[gi(cam * 0.6f + tx)] / 2;
+    rect(tx, 20, 4, gy - 20, to565(0x15321A));
+    rect(tx - 1, 20, 6, 3, to565(0x0E2A16));
+    disc(tx + 1, 18, 10, to565(0x1B5A2C));
+    disc(tx - 6, 22, 6, to565(0x226B34));
+    disc(tx + 8, 22, 6, to565(0x226B34));
+  }
+}
+
+/* Plants and flowers stand at the road's own speed. */
+static void draw_jungle_ground(void) {
+  int x;
+  for (x = 0; x < W; x++) {
+    float wx = cam + x;
+    int g = gnd[gi(wx)];
+    int m;
+    if (g >= H || g >= 300) continue;
+    m = (int)wx % 150;
+    if (m == 0) {
+      /* a giant carnivore plant: stem, bulb, mouth and teeth */
+      rect(x - 1, g - 20, 3, 20, to565(0x2E6A2A));
+      disc(x, g - 26, 7, to565(0x7A1E4A));
+      disc(x, g - 27, 4, to565(0x2A0618));
+      px(x - 4, g - 28, to565(0xFFFFFF));
+      px(x + 3, g - 28, to565(0xFFFFFF));
+      px(x - 2, g - 24, to565(0xFFFFFF));
+      px(x + 1, g - 24, to565(0xFFFFFF));
+      rect(x - 5, g - 32, 4, 2, to565(0x3FC24A));
+      rect(x + 2, g - 33, 4, 2, to565(0x3FC24A));
+    } else if (m % 40 == 0) {
+      /* a bush with two flowers in it */
+      disc(x, g - 4, 5, to565(0x1E5A2C));
+      disc(x + 5, g - 3, 4, to565(0x2E7A3A));
+      px(x - 2, g - 8, to565(0xFFB0D8));
+      px(x + 5, g - 7, to565(0xFFF0A0));
+    } else if (m % 7 == 0) {
+      px(x, g - 1, to565(0x9FFFB0));
+    }
+  }
+}
+
 static void draw_world(void) {
   int x, i;
 
@@ -867,6 +1061,8 @@ static void draw_world(void) {
   }
 
   disc(W - 64, 42, 13, to565(0xF2D8A0));
+
+  if (stage_i == 3) draw_jungle_back();
 
   for (x = 0; x < W; x++) {
     int idx = gi(cam * 0.35f + x);
@@ -889,6 +1085,8 @@ static void draw_world(void) {
     px(x, g, col_grass);
     if ((((int)wx / 2) % 17) == 0) px(x, g + 5, col_stone);
   }
+
+  if (stage_i == 3) draw_jungle_ground();
 
   if (has_bridge) {
     /* The span rides over one cut: dark air under the planks, and nothing
@@ -940,6 +1138,42 @@ static void draw_world(void) {
   }
 
   draw_boss();
+
+  /* the fairy's weather, drawn over the road she stands on */
+  for (i = 0; i < MAX_ARROWS; i++) {
+    int ax, ay;
+    if (!arrows[i].live) continue;
+    ax = (int)(arrows[i].x - cam);
+    ay = (int)arrows[i].y;
+    if (ax < -4 || ax > W + 4) continue;
+    px(ax, ay, to565(0x7DE08A));
+    px(ax, ay + 1, to565(0x9FFFB0));
+    px(ax - 1, ay + 2, to565(0x2E7A4A));
+    px(ax - 1, ay - 1, to565(0xFFB0D8));
+  }
+  if (fball.live) {
+    int fx = (int)(fball.x - cam), fy = (int)fball.y;
+    rect(fx - 12, fy + 1, 5, 1, to565(0x8A3A10));
+    disc(fx, fy, 8, to565(0xB03A12));
+    disc(fx, fy, 6, to565(0xFF8A3C));
+    disc(fx + 1, fy, 3, to565(0xFFD166));
+    disc(fx + 2, fy, 2, to565(0xFFF6D8));
+  }
+  for (i = 0; i < MAX_CLONES; i++) {
+    int cx, cy, wing;
+    if (clones[i].life <= 0.0f) continue;
+    if (clones[i].life < 1.2f && sinf(clones[i].life * 20.0f) < 0.0f) continue;
+    cx = (int)(clones[i].x - cam);
+    cy = (int)ground_y(clones[i].x) - 12;
+    wing = (int)(sinf(clones[i].life * 12.0f) * 2.0f);
+    disc(cx, cy - 8, 7, to565(0x1B4A2A));
+    disc(cx - 6, cy - 12 + wing, 4, to565(0x2E7A4A));
+    disc(cx + 6, cy - 12 - wing, 4, to565(0x2E7A4A));
+    rect(cx - 4, cy - 8, 8, 9, to565(0x2A5A34));
+    rect(cx - 3, cy - 13, 6, 5, to565(0x2E7A4A));
+    px(cx - 2, cy - 11, to565(0x9FFFB0));
+    px(cx + 2, cy - 11, to565(0x9FFFB0));
+  }
 
   /* Her X wears whatever the peddler put in it: flame, a violet bolt, the
    * same white shard she started with — and a look of its own once two or
@@ -1062,6 +1296,26 @@ static void draw_boss(void) {
     rect(bx - 6, by - 10, 4, 10, to565(0x3A2414));
     rect(bx + 2, by - 10, 4, 10, to565(0x3A2414));
     if (boss.claw_t > 0.0f) rect(bx - 20, by - 30, 9, 4, to565(0xD89A4C));
+  } else if (boss.kind == 3) {
+    /* the Forest Fairy: a glow with wings, a green dress and a wand */
+    int wing = (int)(sinf(boss.bob * 9.0f) * 2.0f);
+    disc(bx, by - 14, 13, to565(0x16422A));
+    disc(bx, by - 14, 10, to565(0x226B3A));
+    disc(bx - 8, by - 18 + wing, 5, to565(0xBFF0C0));
+    disc(bx + 8, by - 18 - wing, 5, to565(0xBFF0C0));
+    rect(bx - 5, by - 12, 10, 12, to565(0x3FC24A));
+    rect(bx - 6, by - 14, 12, 3, to565(0x7DE08A));
+    rect(bx - 4, by - 19, 8, 6, to565(0xE8C0A0));
+    rect(bx - 5, by - 20, 10, 3, to565(0x8AE060));
+    px(bx - 2, by - 16, to565(0x1A2A12));
+    px(bx + 2, by - 16, to565(0x1A2A12));
+    px(bx, by - 22, to565(0xFFF0A0));
+    px(bx - 2, by - 22, to565(0xFFE060));
+    px(bx + 2, by - 22, to565(0xFFE060));
+    rect(bx + 7, by - 18, 1, 9, to565(0x8A6238));
+    px(bx + 7, by - 19, to565(0xFFF0A0));
+    /* while the rain is strung, a green line gathers over her */
+    if (boss.rain_t > 0.0f) rect(bx - 7, by - 27, 15, 2, to565(0x9FFFB0));
   } else {
     rect(bx - 16, by - 22, 30, 12, to565(0x1D5A60));
     rect(bx - 14, by - 25, 24, 6, to565(0x8FC9BF));
@@ -1149,6 +1403,7 @@ static void draw_hud(void) {
   if (boss.alive && boss.active && boss.kind == 2 && boss.steam_t > 0.0f) {
     text_center("STEAM COMING - JUMP IT", H - 12, 1, to565(0xFFE0A0));
   }
+  if (fball.live) text_center("FIREBALL - JUMP IT", H - 12, 1, to565(0xFFB066));
 
   if (banner > 0.0f) {
     text_center(STAGES[stage_i].name, 56, 1, to565(0xF0ECDC));
@@ -1347,7 +1602,7 @@ void game_update(float dt, GameInput in) {
     state_t -= dt;
     if (state_t <= 0) {
       /* The next road begins at the peddler's stall. */
-      if (stage_i < 2) reset_stage(stage_i + 1);
+      if (stage_i < 3) reset_stage(stage_i + 1);
       else { state = 3; finished = 1; }
     }
   } else if (state == 4) {

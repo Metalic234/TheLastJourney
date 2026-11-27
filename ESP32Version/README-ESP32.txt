@@ -9,8 +9,8 @@ display about 30 times a second.
 WHAT IT IS (AND IS NOT)
 -----------------------
 This is the pocket edition, not a byte-for-byte port of the desktop game.
-It keeps the shape of the story — three roads, memory shards to collect,
-spiders on the path, a keeper at the end of the last two roads, a death
+It keeps the shape of the story — four roads, memory shards to collect,
+spiders on the path, a keeper at the end of the last three roads, a death
 that restarts the stage, and an ending — but it runs with simplified art,
 no voyage and no sound. The full game stays on Android, Windows and the
 web.
@@ -40,7 +40,7 @@ CONTROLS
 
 THE KEEPERS
 -----------
-The last two roads end in a fight. The keeper holds the end of the road
+The last three roads end in a fight. The keeper holds the end of the road
 and cannot be walked past.
 
   THE TIGER OF THE RUINS   ends the drowned ruins. It stalks her on two
@@ -57,6 +57,26 @@ and cannot be walked past.
                            and takes a heart — unless she is in the air:
                            it rolls low along the planks, so a jump clears
                            it.
+  THE FOREST FAIRY         ends the Verdant Wilds, the fourth road. She
+                           hovers out of reach and lets the wood fight for
+                           her:
+                             POISONED ARROWS   six of them come out of the
+                                               canopy over wherever she
+                                               stands. Standing still is
+                                               what gets her hit: keep
+                                               moving and they fall behind.
+                             A FIREBALL        rolls along the ground after
+                                               her and takes a heart unless
+                                               she is in the air — jump it,
+                                               the way the dragon's blast
+                                               is jumped.
+                             SHADOW CLONES     two dark copies of her stand
+                                               beside her and each looses
+                                               an arrow every second and a
+                                               half. Only the bright one
+                                               takes a shard.
+                           Her bar is longer than the other two keepers':
+                           twelve hits against their nine.
 
 Shards wear a keeper down; its health bar sits at the top of the screen.
 Both of them are worth a payout from the road's soul purse, and the road
@@ -143,6 +163,13 @@ the image when pushing it, or switch the panel offset.
 At 40 MHz SPI the display update is roughly 25 ms, so the game is capped
 at 30 fps in the sketch. Lower FRAME_TIME to taste.
 
+The fourth road did not need a bigger board. Static state is 123,008 bytes
+of .bss plus 1,600 bytes of initialised data — 124.6 KB in all, of which
+115,200 bytes are the framebuffer. The whole game, every road, the tiger,
+the dragon and the fairy ask for 288 bytes more than the three-road build
+did: the wilds' stage record, eight falling arrows, one fireball and two
+shadow clones.
+
 TRY IT WITHOUT HARDWARE
 -----------------------
 The engine is plain C99 with no Arduino dependencies. A host harness runs
@@ -152,9 +179,10 @@ it on a desktop, plays a scripted run and writes PPM frames:
   ./build-host.sh            # needs cc; writes ./frames/frame_*.ppm
 
 That is how this port was tested: it compiles warning-free with
--Wall -Wextra, the scripted runner clears all three roads and reaches the
-ending (frame dumps show the title cards, the pits, the spiders, the
-memories, the burning city and THE END).
+-Wall -Wextra, the scripted runner clears all four roads — the tiger, the
+dragon and the Forest Fairy among them — and reaches the ending (frame
+dumps show the title cards, the pits, the spiders, the memories, the
+burning city, the wilds and THE END).
 
 FILES
 -----
