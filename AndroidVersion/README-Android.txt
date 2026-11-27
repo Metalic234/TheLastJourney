@@ -1,5 +1,16 @@
-THE LAST JOURNEY — Android Edition (v2.2.10)
+THE LAST JOURNEY — Android Edition (v2.2.11)
 =============================================
+
+WHAT'S NEW IN v2.2.11
+----------------------
+- THE LEFT HAND ONLY STEERS. Two round, domed arrow keys, LEFT and RIGHT,
+  sit under the thumb; they got bigger, rounder and a brighter lit rim.
+- THE RIGHT HAND DOES EVERYTHING ELSE. JUMP sits directly on top of RUN
+  against the edge of the phone, with the fight keys (C BEAM over X SHARD)
+  inboard of them and E USE in the corner. Hold JUMP for GLIDE, hold RUN to
+  sprint, tap RUN to dash once learned.
+- The whole right column still sizes itself to the screen, so small and
+  portrait phones keep every key above a finger's width.
 
 WHAT'S NEW IN v2.2.10
 ----------------------
@@ -389,11 +400,10 @@ HOW TO PLAY ON TOUCH
 The game auto-scales to your screen in landscape. The controls are split by
 hand:
 
-  Bottom-left:   ^  JUMP    a wide bar over both directions
-                          (hold in mid-air to GLIDE once learned)
-                 <  >      walk left / right
+  Bottom-left:   <  >      LEFT / RIGHT    walk left and right
+  Bottom-right:  ^  JUMP   hold in mid-air for GLIDE once learned
                  >> RUN    hold to sprint, tap to dash once learned
-  Bottom-right:  C  BEAM   hold for the knights' light (in a fight)
+                 C  BEAM   hold for the knights' light (in a fight)
                  X  SHARD  throw the volley (in a fight)
                  E  USE    interact / talk / collect / continue / choose
   Top-right:     ||        pause (the RESTART button appears while paused)

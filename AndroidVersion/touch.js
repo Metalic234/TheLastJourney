@@ -2,9 +2,11 @@
 // Builds a translucent button overlay that drives the game through the
 // window.__gameInput bridge installed by src/input.js.
 //
-// The hands are split down the middle: the left thumb walks, runs and jumps,
-// the right thumb fights. Every button is a rounded, lit key with a one-word
-// caption, so nothing on the glass has to be guessed at.
+// The left thumb only steers: two round chevrons for walking. Everything she
+// does with the other hand lives on the right, in one column - JUMP over RUN,
+// then the fight keys (BEAM over SHARD) with USE inboard of them. Every button
+// is a rounded, lit key with a one-word caption, so nothing on the glass has
+// to be guessed at.
 //
 // build-apk.sh copies this file (and touch.css) over assets/www in the base
 // APK, so changes here reach the installed game without a new base APK.
@@ -94,45 +96,50 @@
       return b;
     };
 
-    // LEFT THUMB: walking, running, jumping.
-    // A wide JUMP bar sits over the two directions; RUN (hold to sprint, tap
-    // to dash once she has it) is beside them, under the thumb that leaves
-    // the arrows.
+    // LEFT THUMB: steering only. Two round keys, one for each way she can go,
+    // sitting where the thumb already rests.
     const pad = document.createElement('div');
     pad.className = 'tj-pad';
-    const jump = mk('tj-jump', '&#9650;', 'JUMP');
-    const left = mk('tj-walk tj-left', '&#9664;');
-    const right = mk('tj-walk tj-right', '&#9654;');
-    const dash = mk('tj-run tj-dash', '&#187;', 'RUN');
-    bindHold(jump, 'up');
+    const left = mk('tj-walk tj-left', '&#9664;', 'LEFT');
+    const right = mk('tj-walk tj-right', '&#9654;', 'RIGHT');
     bindHold(left, 'left');
     bindHold(right, 'right');
-    // Hold to run from the first step, tap to dash once the power is awake:
-    // both use the same held action, so this has to be a hold button.
-    bindHold(dash, 'dash');
-    pad.appendChild(jump);
     pad.appendChild(left);
     pad.appendChild(right);
-    pad.appendChild(dash);
 
-    // RIGHT THUMB: fighting, with E in the corner of the same hand.
-    // X throws the volley and C holds the knights' beam; the two of them stack
-    // under the E button, nearest the thumb.
+    // RIGHT THUMB: everything else. JUMP sits over RUN against the edge of the
+    // phone, the fight keys (C over X) sit inboard of them, and E takes the
+    // quiet corner further in.
     const acts = document.createElement('div');
     acts.className = 'tj-acts';
-    const fight = document.createElement('div');
-    fight.className = 'tj-fight';
+    const jump = mk('tj-jump', '&#9650;', 'JUMP');
+    const dash = mk('tj-run tj-dash', '&#187;', 'RUN');
     const shard = mk('tj-fight-key tj-shard', 'X', 'SHARD');
     const laser = mk('tj-fight-key tj-laser', 'C', 'BEAM');
     const use = mk('tj-use', 'E', 'USE');
+    bindHold(jump, 'up');
+    // Hold to run from the first step, tap to dash once the power is awake:
+    // both use the same held action, so this has to be a hold button.
+    bindHold(dash, 'dash');
     bindTap(shard, 'shard');
     bindHold(laser, 'laser');
     bindTap(use, 'interact');
+
+    const move = document.createElement('div');
+    move.className = 'tj-move';
+    move.appendChild(jump);
+    move.appendChild(dash);
+
+    const fight = document.createElement('div');
+    fight.className = 'tj-fight';
     fight.appendChild(laser);
     fight.appendChild(shard);
-    // E sits inboard of the fight column, so X stays under the resting thumb.
+
+    // USE inboard, then the fight column, then JUMP/RUN on the outside edge so
+    // X and RUN stay under the resting thumb.
     acts.appendChild(use);
     acts.appendChild(fight);
+    acts.appendChild(move);
 
     // system buttons (top right)
     const sys = document.createElement('div');
@@ -164,8 +171,8 @@
     // because holding it walks her into a sprint whether or not Ember Dash has
     // been awakened yet. X (shards) and C (beam) are only ever used inside the
     // two big battles (guardian knights = game.bossBattle, wilds = game.combat),
-    // so the whole fight stack appears exactly then and E sits alone in the
-    // corner on every quiet road.
+    // so the whole fight column appears exactly then and E sits alone beside
+    // JUMP/RUN on every quiet road.
     const game = () => window.__game;
     function refresh() {
       const g = game();
