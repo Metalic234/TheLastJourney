@@ -6,6 +6,19 @@
  */
 
 #tj-controls {
+  /* Everything is sized from the viewport with a floor at finger size, so a
+     640x320 phone gets the same two clusters as a tablet without the keys
+     shrinking into nothing or the two hands colliding. */
+  --tj-edge: 12px;
+  --tj-gap: 10px;
+  --tj-walk: clamp(46px, 7.5vw, 64px);
+  --tj-run: clamp(44px, 6.8vw, 58px);
+  --tj-jump-h: clamp(48px, 7vw, 54px);
+  --tj-walk-h: clamp(46px, 8vw, 64px);
+  --tj-shard: clamp(56px, 9.2vw, 78px);
+  --tj-laser-w: clamp(50px, 8.3vw, 70px);
+  --tj-laser-h: clamp(46px, 7vw, 58px);
+  --tj-use: clamp(46px, 6.9vw, 58px);
   position: fixed;
   top: 0;
   left: 0;
@@ -76,12 +89,12 @@
   position: absolute;
   left: 12px; /* fallback for WebViews without env() */
   bottom: 14px;
-  left: calc(12px + env(safe-area-inset-left, 0px));
+  left: calc(var(--tj-edge) + env(safe-area-inset-left, 0px));
   bottom: calc(14px + env(safe-area-inset-bottom, 0px));
   display: grid;
-  grid-template-columns: 64px 64px 58px;
-  grid-template-rows: 54px 64px;
-  gap: 10px;
+  grid-template-columns: var(--tj-walk) var(--tj-walk) var(--tj-run);
+  grid-template-rows: var(--tj-jump-h) var(--tj-walk-h);
+  gap: var(--tj-gap);
 }
 
 /* the wide jump bar over both directions */
@@ -124,11 +137,11 @@
   position: absolute;
   right: 12px; /* fallback for WebViews without env() */
   bottom: 14px;
-  right: calc(12px + env(safe-area-inset-right, 0px));
+  right: calc(var(--tj-edge) + env(safe-area-inset-right, 0px));
   bottom: calc(14px + env(safe-area-inset-bottom, 0px));
   display: flex;
   align-items: flex-end;
-  gap: 12px;
+  gap: var(--tj-gap);
 }
 
 /* C above X, stacked against the edge of the phone */
@@ -136,7 +149,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
+  gap: var(--tj-gap);
 }
 
 .tj-fight-key {
@@ -145,8 +158,8 @@
 
 .tj-shard {
   --tj-accent: 198, 146, 255;
-  width: 78px;
-  height: 78px;
+  width: var(--tj-shard);
+  height: var(--tj-shard);
 }
 
 .tj-shard .tj-glyph {
@@ -155,8 +168,8 @@
 
 .tj-laser {
   --tj-accent: 110, 222, 255;
-  width: 70px;
-  height: 58px;
+  width: var(--tj-laser-w);
+  height: var(--tj-laser-h);
 }
 
 .tj-laser .tj-glyph {
@@ -165,8 +178,8 @@
 
 .tj-use {
   --tj-accent: 255, 220, 150;
-  width: 58px;
-  height: 58px;
+  width: var(--tj-use);
+  height: var(--tj-use);
   border-radius: 18px;
 }
 
@@ -187,9 +200,9 @@
 }
 
 .tj-sysbtn {
-  width: 42px;
-  height: 42px;
-  border-radius: 14px;
+  width: 46px;
+  height: 46px;
+  border-radius: 15px;
   background:
     radial-gradient(130% 110% at 50% 0%, rgba(150, 164, 214, 0.26), rgba(14, 16, 30, 0.6) 72%),
     rgba(8, 10, 20, 0.5);
@@ -204,18 +217,47 @@
   color: #ffe2c4;
 }
 
+/* Short screens: the clusters keep their width but give back height, so they
+   do not eat half of a 320px-tall phone. */
+@media (max-height: 340px) {
+  #tj-controls {
+    --tj-edge: 8px;
+    --tj-gap: 8px;
+    --tj-jump-h: 46px;
+    --tj-walk-h: 48px;
+    --tj-shard: clamp(54px, 9vw, 70px);
+    --tj-laser-w: clamp(48px, 8vw, 62px);
+    --tj-laser-h: 44px;
+    --tj-use: 46px;
+  }
+}
+
+/* Narrow portrait phones: the two hands share a 360px width, so each key
+   gives up a few pixels rather than the clusters overlapping. */
+@media (max-width: 420px) and (orientation: portrait) {
+  #tj-controls {
+    --tj-edge: 8px;
+    --tj-gap: 8px;
+  }
+}
+
 /* On the title screen the game says "press any key": pull the controls back
-   so the art reads, then let them grow once play begins. */
+   so the art reads, then let them grow once play begins. The pull-back is a
+   fraction of whatever size the screen gave them, never a fixed size, so it
+   cannot make the keys larger than they are in play on a small phone. */
 .tj-title .tj-pad {
-  grid-template-columns: 54px 54px 50px;
-  grid-template-rows: 46px 54px;
+  grid-template-columns:
+    max(44px, calc(var(--tj-walk) * 0.86)) max(44px, calc(var(--tj-walk) * 0.86))
+    max(44px, calc(var(--tj-run) * 0.86));
+  grid-template-rows:
+    max(44px, calc(var(--tj-jump-h) * 0.86)) max(44px, calc(var(--tj-walk-h) * 0.86));
   gap: 8px;
 }
 
 .tj-title .tj-jump .tj-glyph { font-size: 17px; }
 .tj-title .tj-walk .tj-glyph { font-size: 20px; }
 .tj-title .tj-run .tj-glyph { font-size: 25px; }
-.tj-title .tj-shard { width: 66px; height: 66px; }
-.tj-title .tj-laser { width: 60px; height: 50px; }
-.tj-title .tj-use { width: 50px; height: 50px; }
-.tj-title .tj-sysbtn { width: 36px; height: 36px; }
+.tj-title .tj-shard { width: max(50px, calc(var(--tj-shard) * 0.86)); height: max(50px, calc(var(--tj-shard) * 0.86)); }
+.tj-title .tj-laser { width: max(46px, calc(var(--tj-laser-w) * 0.86)); height: max(44px, calc(var(--tj-laser-h) * 0.86)); }
+.tj-title .tj-use { width: max(44px, calc(var(--tj-use) * 0.86)); height: max(44px, calc(var(--tj-use) * 0.86)); }
+.tj-title .tj-sysbtn { width: 44px; height: 44px; }

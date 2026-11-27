@@ -1,5 +1,16 @@
-THE LAST JOURNEY — Android Edition (v2.2.9)
-============================================
+THE LAST JOURNEY — Android Edition (v2.2.10)
+=============================================
+
+WHAT'S NEW IN v2.2.10
+----------------------
+- THE CONTROLS FIT ANY PHONE. Every key is sized from the screen now, with
+  a floor at finger size, instead of being a fixed number of pixels. On a
+  small 640x320 phone the two hands sit 356px apart with nothing overlapping;
+  in portrait they still keep a 100px gap between them, and the keys never
+  grow so large that they swallow the road. The pause and mute keys were
+  also up-sized to a full touch target.
+- THE TITLE CARD STILL PULLS THE CONTROLS BACK, but only a little, and never
+  below a size she can actually hit.
 
 WHAT'S NEW IN v2.2.9
 ---------------------
