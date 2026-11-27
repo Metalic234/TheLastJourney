@@ -103,6 +103,22 @@ const CONFIGS = [
     exitX: 3300,
     amp: 4.2,
     hostile: true,
+    // Snow rats: small, pale, and always in the open where the snow is thin.
+    ratKind: 'snow',
+    rats: [
+      { x: 470 },
+      { x: 510 },
+      { x: 880 },
+      { x: 920 },
+      { x: 1180 },
+      { x: 1520 },
+      { x: 1560 },
+      { x: 1990 },
+      { x: 2380 },
+      { x: 2420 },
+      { x: 2620 },
+      { x: 2960 },
+    ],
     boss: {
       kind: 'giant',
       x: 3120,
@@ -139,6 +155,19 @@ const CONFIGS = [
     exitX: 2000,
     amp: 1.4,
     hostile: true,
+    // Sewage rats, come up out of the drains of the ruined street.
+    ratKind: 'sewage',
+    rats: [
+      { x: 200 },
+      { x: 240 },
+      { x: 470 },
+      { x: 640 },
+      { x: 830 },
+      { x: 870 },
+      { x: 1180 },
+      { x: 1240 },
+      { x: 1460 },
+    ],
     boss: {
       kind: 'tiger',
       x: 1930,
@@ -299,6 +328,84 @@ const CONFIGS = [
     whaleBridge: 1,
     dolphinBridges: [0, 2],
     memories: [],
+  },
+  {
+    id: 'jungle',
+    numeral: 'IX',
+    name: 'THE VERDANT WILDS',
+    theme: 'jungle',
+    width: 5200,
+    seed: 6037,
+    spawnX: 42,
+    exitX: 5140,
+    amp: 2.6,
+    hostile: true,
+    // Little elves keep to the shade between the flowers, each one dressed
+    // and made differently from the last.
+    elves: [
+      { x: 520, home: 520, variant: 0 },
+      { x: 760, home: 760, variant: 1 },
+      { x: 1120, home: 1120, variant: 2 },
+      { x: 1180, home: 1180, variant: 3 },
+      { x: 1620, home: 1620, variant: 4 },
+      { x: 1960, home: 1960, variant: 5 },
+      { x: 2020, home: 2020, variant: 0 },
+      { x: 2480, home: 2480, variant: 1 },
+      { x: 2820, home: 2820, variant: 2 },
+      { x: 3260, home: 3260, variant: 3 },
+      { x: 3320, home: 3320, variant: 4 },
+      { x: 3760, home: 3760, variant: 5 },
+      { x: 4150, home: 4150, variant: 0 },
+      { x: 4460, home: 4460, variant: 2 },
+    ],
+    // Three of them hold the deep glade, one after another. The glade is one
+    // arena; it changes hands as each of them falls.
+    bosses: [
+      {
+        kind: 'fairy',
+        x: 4970,
+        triggerX: 4780,
+        arenaMin: 4740,
+        arenaMax: 5170,
+        hp: 170,
+        name: 'THE FOREST FAIRY',
+        subtitle: 'MISTRESS OF THE GREEN',
+        color: '#a8f08a',
+      },
+      {
+        kind: 'love',
+        x: 4990,
+        triggerX: 4780,
+        arenaMin: 4740,
+        arenaMax: 5170,
+        hp: 190,
+        name: 'THE LOVE GODDESS',
+        subtitle: 'EVERY HEART SHE THROWS IS POISONED',
+        color: '#ff9ac8',
+      },
+      {
+        kind: 'ocean',
+        x: 5000,
+        triggerX: 4780,
+        arenaMin: 4740,
+        arenaMax: 5170,
+        hp: 230,
+        name: 'THE OCEAN RAGE GOD',
+        subtitle: 'THE TIDE THAT NEVER FORGIVES',
+        color: '#7fd8ff',
+      },
+    ],
+    points: [
+      [0, 232], [420, 224], [820, 234], [1220, 220], [1620, 232],
+      [2020, 222], [2420, 234], [2820, 224], [3220, 232], [3620, 222],
+      [4020, 232], [4400, 226], [4780, 230], [5200, 224],
+    ],
+    memories: [
+      {
+        id: 'petal', x: 2680, title: 'A PETAL', color: '#ffc2e0',
+        text: 'Something enormous stopped blooming here a long time ago. One petal is all that fell.',
+      },
+    ],
   },
 ];
 
@@ -1067,6 +1174,216 @@ function paintCliffs(level, g, rng) {
   }
 }
 
+// ---------- the verdant wilds ----------------------------------------------
+
+function jungleFern(g, x, baseY, rng, scale = 1) {
+  const dir = rng() < 0.5 ? -1 : 1;
+  const len = Math.round(rand(rng, 5, 11) * scale);
+  const col = pick(rng, ['#2f7040', '#47934b', '#245436', '#5aab52']);
+  g.fillStyle = col;
+  for (let k = 0; k < len; k++) {
+    const t = k / len;
+    const px = x + dir * k * 0.9;
+    const py = baseY - Math.sin(t * Math.PI) * len * 0.9;
+    g.fillRect(R(px), R(py), 1, 1);
+    if (k > 1 && k % 2 === 0) {
+      g.fillRect(R(px) + 1, R(py) + 1, 1, 1);
+      g.fillRect(R(px) - 1, R(py) + 1, 1, 1);
+    }
+  }
+}
+
+function jungleFlower(g, x, baseY, rng, big = false) {
+  const h = big ? randInt(rng, 7, 13) : randInt(rng, 2, 6);
+  const col = pick(rng, ['#ff8fc4', '#ffd166', '#c9a4ff', '#ff9a6a', '#f5f0b0', '#ff6f91']);
+  rect(g, x, baseY - h, 1, h, '#2f6b3c');
+  const top = baseY - h;
+  const r = big ? 3.4 : 2;
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2;
+    rect(g, x + Math.cos(a) * r, top + Math.sin(a) * r * 0.8, 1, 1, col);
+  }
+  rect(g, x, top, 1, 1, '#fff6c8');
+  if (big) {
+    rect(g, x - 1, top - 1, 1, 1, col);
+    rect(g, x + 1, top + 1, 1, 1, col);
+  }
+  return top;
+}
+
+function jungleBush(g, x, baseY, rng) {
+  const clumps = randInt(rng, 3, 6);
+  const w = rand(rng, 9, 20);
+  for (let i = 0; i < clumps; i++) {
+    const bx = x + rand(rng, -w * 0.8, w * 0.8);
+    const by = baseY - rand(rng, 1, 7);
+    const r = rand(rng, 3.5, 7);
+    blob(g, bx, by, r, r * rand(rng, 0.6, 0.85), pick(rng, ['#22522c', '#2f6b33', '#3d8340']), rng, '#4f9a46');
+  }
+  // a few berries or blossoms sitting on the mass
+  for (let i = 0; i < 3; i++) {
+    rect(g, x + rand(rng, -w * 0.6, w * 0.6), baseY - rand(rng, 3, 10), 1, 1,
+      pick(rng, ['#ff8fc4', '#ffd166', '#f3f7c6']));
+  }
+}
+
+// A giant carnivore: a thick stalk, broad spotted leaves, and a maw of two
+// jaws that are always slightly open. It watches the path without moving.
+function carnivorePlant(g, x, baseY, rng, opts = {}) {
+  const h = opts.h ?? rand(rng, 34, 76);
+  const lean = rand(rng, -4, 4);
+  const stem = opts.stem ?? '#2a5730';
+  const lip = opts.lip ?? '#4f8a3c';
+  const mouth = opts.mouth ?? '#7d2140';
+  const tooth = opts.tooth ?? '#f2f7d8';
+  const cxAt = (y) => x + lean * ((baseY - y) / h);
+
+  for (let y = 0; y < h * 0.74; y++) {
+    const w = Math.max(2, Math.round(3 + y * 0.02));
+    rect(g, cxAt(baseY - y) - w / 2, baseY - y, w, 1, stem);
+    rect(g, cxAt(baseY - y) + w / 2 - 1, baseY - y, 1, 1, lip);
+  }
+  // leaves climbing the stalk
+  for (let i = 0; i < 3; i++) {
+    const ly = baseY - h * (0.16 + i * 0.18);
+    const dir = i % 2 ? 1 : -1;
+    const len = rand(rng, 9, 19);
+    for (let k = 0; k < len; k++) {
+      const t = k / len;
+      rect(g, cxAt(ly) + dir * k, ly + Math.sin(t * 2.2) * 3 - t * t * 7, 2, 2,
+        k % 3 ? '#2f6b33' : '#45914a');
+    }
+  }
+
+  const mawY = baseY - h * 0.76;
+  const mx = cxAt(mawY);
+  const w = opts.w ?? rand(rng, 9, 15);
+  blob(g, mx, mawY - w * 0.5, w * 0.82, w * 0.48, mouth, rng, '#c25a78');
+  // upper jaw, hooded over the mouth
+  for (let r = 0; r < w * 0.62; r++) {
+    const ww = w * (1 - r / (w * 0.62));
+    rect(g, mx - ww, mawY - w * 1.02 - r, ww * 2, 1, lip);
+  }
+  // lower jaw
+  for (let r = 0; r < w * 0.4; r++) {
+    const ww = w * (0.85 - (r / (w * 0.4)) * 0.85);
+    rect(g, mx - ww, mawY - w * 0.06 + r, ww * 2, 1, lip);
+  }
+  // teeth along both jaws
+  for (let i = 0; i < 5; i++) {
+    const tx = mx - w * 0.7 + i * w * 0.35;
+    rect(g, tx, mawY - w * 0.1, 1, 3, tooth);
+    rect(g, tx + 1, mawY - w * 0.88, 1, 3, tooth);
+  }
+  // speckles and a wet shine inside
+  for (let i = 0; i < 12; i++) {
+    rect(g, mx + rand(rng, -w, w) * 0.7, mawY - rand(rng, 0, w * 0.9), 1, 1, '#cfe98f');
+  }
+  rect(g, mx - 1, mawY - w * 0.45, 2, 1, 'rgba(255,220,240,0.5)');
+  return { x: mx, y: mawY - w * 0.45 };
+}
+
+function paintJungle(level, g, rng) {
+  const { width, ground } = level;
+  for (let x = 0; x < width; x++) {
+    const gy = R(ground[x]);
+    rect(g, x, gy, 1, 2, '#a6e87c');
+    rect(g, x, gy + 2, 1, 3, '#63b24a');
+    rect(g, x, gy + 5, 1, 6, '#3f8a3e');
+    rect(g, x, gy + 11, 1, 10, '#2a5b30');
+    rect(g, x, gy + 21, 1, Math.max(1, H - gy - 21), '#142a1a');
+  }
+  // loam and leaf litter
+  for (let i = 0; i < width * 1.2; i++) {
+    const x = rng() * width;
+    const gy = R(ground[x | 0]);
+    rect(g, x, gy + 2 + rng() * 30, 1, 1,
+      pick(rng, ['#3a6b38', '#25502b', '#173a1e', '#7a5a34', '#4f8a3e']));
+  }
+  // deep grass, thick enough to hide a rat
+  for (let i = 0; i < width * 1.15; i++) {
+    const x = rng() * width;
+    const gy = R(ground[x | 0]);
+    const col = pick(rng, ['#2f7040', '#47934b', '#245436', '#6cc257']);
+    const hh = randInt(rng, 1, 5);
+    for (let k = 0; k < hh; k++) rect(g, x + (k > 2 ? 1 : 0), gy - 1 - k, 1, 1, col);
+  }
+  // flowers everywhere, a few of them enormous
+  for (let i = 0; i < 300; i++) {
+    const x = rand(rng, 12, width - 12);
+    jungleFlower(g, x, R(groundAt(level, x)), rng, false);
+  }
+  for (let i = 0; i < 26; i++) {
+    const x = rand(rng, 30, width - 30);
+    const top = jungleFlower(g, x, R(groundAt(level, x)), rng, true);
+    if (rng() < 0.5) level.lights.push({
+      x, y: top - 1, r: rand(rng, 8, 16), color: '#ffd7ea', alpha: 0.2, flicker: 0.6,
+    });
+  }
+  // ferns and bushes
+  for (let i = 0; i < 220; i++) {
+    const x = rand(rng, 6, width - 6);
+    jungleFern(g, x, R(groundAt(level, x)), rng, rand(rng, 0.8, 1.7));
+  }
+  for (let i = 0; i < 54; i++) {
+    const x = rand(rng, 20, width - 20);
+    jungleBush(g, x, R(groundAt(level, x)), rng);
+  }
+  // the trees, close enough to walk under
+  let tx = rand(rng, 140, 250);
+  while (tx < width - 90) {
+    const gy = R(groundAt(level, tx));
+    ancientTree(g, tx, gy, rng, {
+      h: rand(rng, 175, 250),
+      w: rand(rng, 14, 26),
+      color: '#062514',
+      rim: '#1c6b36',
+    });
+    tx += rand(rng, 250, 430);
+  }
+  // mid-distance trunks, reading as depth
+  for (let i = 0; i < width / 240; i++) {
+    const x = rng() * width;
+    const gy = R(groundAt(level, x));
+    const h = rand(rng, 70, 140);
+    rect(g, x, gy - h, rand(rng, 3, 7), h, '#08280f');
+    blob(g, x + rand(rng, -10, 10), gy - h - rand(rng, 0, 12), rand(rng, 9, 18), rand(rng, 6, 11), '#0b3a1a', rng, '#1d6b35');
+  }
+
+  // the giant carnivores, standing over the path
+  const plants = [300, 720, 1460, 1890, 2350, 2900, 3420, 3900, 4390, 4640];
+  for (const px of plants) {
+    const top = carnivorePlant(g, px, R(groundAt(level, px)), rng);
+    level.lights.push({
+      x: top.x, y: top.y, r: rand(rng, 22, 36), color: '#ff9ad0', alpha: 0.16, flicker: 0.7,
+    });
+  }
+
+  // the glade where the three of them wait: a ring of moss and old blossoms
+  if (level.boss) {
+    const ax = Math.round((level.bosses[0].arenaMin + level.bosses[0].arenaMax) / 2);
+    const ay = R(groundAt(level, ax));
+    for (let i = 0; i < 90; i++) {
+      const a = (i / 90) * Math.PI * 2;
+      const rx = ax + Math.cos(a) * rand(rng, 150, 190);
+      const ry = ay + Math.sin(a) * 6;
+      rect(g, rx, ry - rand(rng, 1, 3), rand(rng, 1, 3), 2, '#8fbf5e');
+      if (i % 9 === 0) jungleFlower(g, rx, ry, rng, true);
+    }
+    for (let i = 0; i < 5; i++) {
+      const px = ax - 150 + i * 74;
+      carnivorePlant(g, px, R(groundAt(level, px)), rng, { h: rand(rng, 20, 32), w: 7 });
+    }
+  }
+
+  // memory markers
+  for (const m of level.memories) {
+    const gy = R(groundAt(level, m.x));
+    rect(g, m.x - 4, gy - 1, 8, 1, '#cfe3a2');
+    rect(g, m.x - 2, gy - 2, 4, 1, '#f0f8d8');
+  }
+}
+
 function paintMountain(level, g, rng) {
   const { width, ground } = level;
   const snowNoise = makeNoise1(level.seed + 411);
@@ -1558,6 +1875,7 @@ function paintTerrain(level, g, rng) {
     case 'desert': paintDesert(level, g, rng); break;
     case 'mainland': paintMainland(level, g, rng); break;
     case 'cliffs': paintCliffs(level, g, rng); break;
+    case 'jungle': paintJungle(level, g, rng); break;
     case 'mountain': paintMountain(level, g, rng); break;
     case 'city': paintCity(level, g, rng); break;
     case 'port': paintPort(level, g, rng); break;
@@ -1910,6 +2228,116 @@ function buildCliffsLayers(level) {
     for (let y = 206; y < h; y++) {
       const a = clamp((y - 206) / 54, 0, 1) * 0.55;
       g.fillStyle = `rgba(92,132,118,${a})`;
+      g.fillRect(0, y, w, 1);
+    }
+  });
+
+  return [far, mid];
+}
+
+function buildJungleLayers(level) {
+  const far = layerCanvas(level, 0.07, level.seed + 211, (g, w, h, rng) => {
+    for (let y = 0; y < h; y++) {
+      const t = y / h;
+      g.fillStyle = t < 0.55
+        ? mix('#123a3a', '#4f9a5c', Math.pow(t / 0.55, 1.1))
+        : mix('#4f9a5c', '#cfeaa0', Math.pow((t - 0.55) / 0.45, 0.9));
+      g.fillRect(0, y, w, 1);
+    }
+    // a high white sun pouring through the canopy
+    const sx = Math.min(w - 90, 168);
+    const sy = 54;
+    g.save();
+    g.globalCompositeOperation = 'lighter';
+    for (let r = 130; r > 14; r -= 5) disc(g, sx, sy, r, 'rgba(226,255,208,0.012)');
+    g.restore();
+    disc(g, sx, sy, 20, '#f4ffdc');
+    disc(g, sx - 4, sy - 3, 15, '#ffffff');
+    // shafts of light leaning down through the haze
+    g.save();
+    g.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < 9; i++) {
+      const bx = sx + (i - 4) * 22;
+      for (let k = 0; k < 150; k++) {
+        const a = (1 - k / 150) * 0.05;
+        g.fillStyle = `rgba(228,255,196,${a})`;
+        g.fillRect(R(bx + k * 0.42), R(sy + 16 + k), 4 + Math.floor(k / 30), 1);
+      }
+    }
+    g.restore();
+    // three receding bands of canopy, each rounder and greener than the last
+    const bands = [
+      { base: 190, col: 'rgba(96,158,96,0.55)', rim: 'rgba(206,238,168,0.32)', r: [22, 40] },
+      { base: 200, col: 'rgba(56,118,70,0.72)', rim: 'rgba(168,222,142,0.3)', r: [16, 32] },
+      { base: 212, col: 'rgba(28,78,48,0.86)', rim: 'rgba(126,196,116,0.26)', r: [12, 24] },
+    ];
+    for (const band of bands) {
+      for (let x = -30; x < w + 30; x += randInt(rng, 10, 26)) {
+        const top = band.base - rand(rng, 40, 108);
+        const rr = rand(rng, band.r[0], band.r[1]);
+        g.fillStyle = band.col;
+        for (let k = 0; k < 5; k++) {
+          const cx2 = x + rand(rng, -rr * 0.7, rr * 0.7);
+          const cy2 = top + rand(rng, 0, rr * 0.9);
+          blob(g, cx2, cy2, rr * rand(rng, 0.5, 0.9), rr * rand(rng, 0.35, 0.6), band.col, rng);
+        }
+        g.fillStyle = band.rim;
+        g.fillRect(R(x + rand(rng, -rr * 0.4, rr * 0.4)), R(top - 1), 3, 1);
+        g.fillStyle = 'rgba(12,42,26,0.5)';
+        for (let y = band.base - 14; y < h; y++) g.fillRect(x, y, 1, 1);
+      }
+    }
+    // mist lying in the hollows
+    for (let y = 150; y < h; y++) {
+      const a = Math.sin(clamp((y - 150) / 120, 0, 1) * Math.PI) * 0.14;
+      g.fillStyle = `rgba(224,244,206,${a})`;
+      g.fillRect(0, y, w, 1);
+    }
+  });
+
+  const mid = layerCanvas(level, 0.28, level.seed + 223, (g, w, h, rng) => {
+    const baseY = 232;
+    for (let x = 0; x < w; x++) {
+      g.fillStyle = '#0b2412';
+      g.fillRect(x, baseY, 1, h - baseY);
+    }
+    // big trunks with broad crowns, close behind the walking plane
+    let x = -20;
+    while (x < w + 20) {
+      const th = rand(rng, 90, 190);
+      const tw = rand(rng, 6, 14);
+      const top = baseY - th;
+      g.fillStyle = pick(rng, ['#0d2a16', '#102f18', '#0a2111']);
+      for (let y = 0; y < th; y++) {
+        const k = y / th;
+        const ww = Math.max(2, Math.round(tw * (0.7 + k * 0.5)));
+        g.fillRect(R(x - ww / 2), R(top + y), ww, 1);
+      }
+      g.fillStyle = 'rgba(96,168,96,0.22)';
+      g.fillRect(R(x), R(top), 1, th);
+      for (let i = 0; i < 4; i++) {
+        blob(g, x + rand(rng, -30, 30), top - rand(rng, 4, 26), rand(rng, 12, 26), rand(rng, 8, 16),
+          'rgba(16,58,30,0.94)', rng, 'rgba(74,140,78,0.3)');
+      }
+      // hanging lianas
+      g.fillStyle = 'rgba(22,64,36,0.85)';
+      for (let i = 0; i < 4; i++) {
+        const vx = x + rand(rng, -tw, tw);
+        const vlen = rand(rng, 20, 70);
+        for (let k = 0; k < vlen; k++) {
+          g.fillRect(R(vx + Math.sin(k * 0.1 + i) * 2), R(top + 20 + k), 1, 1);
+        }
+      }
+      x += rand(rng, 46, 96);
+    }
+    // undergrowth and great leaves along the floor
+    for (let i = 0; i < w / 12; i++) {
+      const bx = rng() * w;
+      blob(g, bx, baseY - rand(rng, 2, 10), rand(rng, 6, 16), rand(rng, 4, 9), '#12361c', rng, '#2d6b34');
+    }
+    for (let y = 200; y < h; y++) {
+      const a = clamp((y - 200) / 70, 0, 1) * 0.5;
+      g.fillStyle = `rgba(8,26,16,${a})`;
       g.fillRect(0, y, w, 1);
     }
   });
@@ -2458,7 +2886,13 @@ function buildFromConfig(cfg, index) {
     dogs: (cfg.dogs || []).map((d) => ({ ...d })),
     spiders: (cfg.spiders || []).map((d) => ({ ...d })),
     crabs: (cfg.crabs || []).map((d) => ({ ...d })),
-    boss: cfg.boss ? { ...cfg.boss } : null,
+    rats: (cfg.rats || []).map((d) => ({ ...d })),
+    ratKind: cfg.ratKind || 'sewage',
+    elves: (cfg.elves || []).map((d) => ({ ...d })),
+    // A glade can hold more than one keeper: the first one is the boss the
+    // rest of the game already knows how to read.
+    bosses: (cfg.bosses || []).map((b) => ({ ...b })),
+    boss: cfg.bosses ? { ...cfg.bosses[0] } : (cfg.boss ? { ...cfg.boss } : null),
     cliffs: !!cfg.cliffs,
     gaps: (cfg.gaps || []).map((gap) => ({ ...gap })),
     bridges: (cfg.bridges || []).map((bridge) => ({ ...bridge })),
@@ -2507,6 +2941,7 @@ function buildFromConfig(cfg, index) {
     case 'desert': level.layers = buildDesertLayers(level); break;
     case 'mainland': level.layers = buildMainlandLayers(level); break;
     case 'cliffs': level.layers = buildCliffsLayers(level); break;
+    case 'jungle': level.layers = buildJungleLayers(level); break;
     case 'mountain': level.layers = buildMountainLayers(level); break;
     case 'city': level.layers = buildCityLayers(level); break;
     case 'port': level.layers = buildPortLayers(level); break;

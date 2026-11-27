@@ -5,7 +5,7 @@ import {
 } from './util.js';
 import { drawText, wrapText, textWidth } from './font.js';
 import { GIRL, GIRL_SIT, drawGuardian, drawWisp, drawTeen, drawShield, drawDog, drawCrab, drawScorpion, drawSpider, drawSnowGiant, drawDolphin,
-  drawTiger, drawWaterDragon } from './sprites.js';
+  drawTiger, drawWaterDragon, drawRat, drawElf, drawForestFairy, drawLoveGoddess, drawOceanGod } from './sprites.js';
 import { buildLevel, buildCityScene, groundAt, TOTAL_MEMORIES, LEVEL_COUNT } from './levels.js';
 import { AudioEngine } from './audio.js';
 import { Input } from './input.js';
@@ -1122,7 +1122,8 @@ export class Game {
   // paid in one go at its first pickup, and spends the purse at once.
   openSoulPurse(level) {
     const lv = level || this.level;
-    const bots = (lv.dogs?.length || 0) + (lv.spiders?.length || 0) + (lv.crabs?.length || 0);
+    const bots = (lv.dogs?.length || 0) + (lv.spiders?.length || 0) + (lv.crabs?.length || 0)
+      + (lv.rats?.length || 0) + (lv.elves?.length || 0);
     const stone = lv.boss ? 1 : 0;
     this.soulPurse = 35 + Math.floor(Math.random() * 46);
     this.soulPurseStart = this.soulPurse;
@@ -1254,6 +1255,8 @@ export class Game {
     for (const dog of c.dogs) if (dog.alive) foes.push(dog);
     for (const spider of c.spiders) if (spider.alive) foes.push(spider);
     for (const crab of c.crabs) if (crab.alive) foes.push(crab);
+    for (const rat of c.rats) if (rat.alive) foes.push(rat);
+    for (const elf of c.elves) if (elf.alive) foes.push(elf);
     if (c.boss && c.boss.active && c.boss.alive) foes.push(c.boss);
     return foes;
   }
@@ -2444,6 +2447,88 @@ export class Game {
     }
   }
 
+  // One keeper, made ready to fight. Every stage boss comes through here, and
+  // a glade that holds three of them makes three of these, one after another.
+  makeBoss(cfg) {
+    const L = this.level;
+    const kind = cfg && cfg.kind ? cfg.kind : 'scorpion';
+    const BOSS_HP = {
+      giant: 240, tiger: 200, dragon: 160, scorpion: 160,
+      fairy: 170, love: 190, ocean: 230,
+    };
+    const BOSS_NAME = {
+      giant: 'THE SNOW GIANT', tiger: 'THE TIGER OF THE RUINS',
+      dragon: 'THE WATER DRAGON', scorpion: 'THE SCORPION',
+      fairy: 'THE FOREST FAIRY', love: 'THE LOVE GODDESS',
+      ocean: 'THE OCEAN RAGE GOD',
+    };
+    const BOSS_SUBTITLE = {
+      giant: 'THE PASS ITSELF', tiger: 'WHAT THE FIRE LEFT BEHIND',
+      dragon: 'KEEPER OF THE LAST BRIDGE', scorpion: 'THE OLD KEEPER OF THE DUNES',
+      fairy: 'MISTRESS OF THE GREEN', love: 'EVERY HEART SHE THROWS IS POISONED',
+      ocean: 'THE TIDE THAT NEVER FORGIVES',
+    };
+    const BOSS_COLOR = {
+      giant: '#b9dff2', tiger: '#e8a34a', dragon: '#8fe0d8', scorpion: '#d28a52',
+      fairy: '#a8f08a', love: '#ff9ac8', ocean: '#7fd8ff',
+    };
+    const homeBridge = cfg && kind === 'dragon' && L.bridges
+      ? L.bridges[cfg.bridge ?? L.bridges.length - 1] : null;
+    const homeSea = cfg && kind === 'dragon' && L.seas && L.seas.length
+      ? L.seas[0] : null;
+    return {
+      id: kind,
+      kind,
+      name: cfg.name || BOSS_NAME[kind],
+      subtitle: cfg.subtitle || BOSS_SUBTITLE[kind],
+      color: cfg.color || BOSS_COLOR[kind],
+      x: cfg.x,
+      hp: cfg.hp || BOSS_HP[kind],
+      maxHp: cfg.hp || BOSS_HP[kind],
+      alive: true,
+      active: false,
+      intro: 0,
+      flash: 0,
+      attackCd: 1.8,
+      stingT: 0,
+      stingMax: 0.95,
+      stingX: cfg.x,
+      stingHit: true,
+      clawT: 0,
+      clawMax: 0.55,
+      clawHit: true,
+      slamT: 0,
+      slamMax: 1.0,
+      slamX: cfg.x,
+      slamHit: true,
+      facing: -1,
+      stomp: 0,
+      // the tiger crouches and pounces; the dragon hops its bridge and breathes
+      pounceT: 0,
+      pounceMax: 0.55,
+      pounceX: cfg.x,
+      baseY: homeSea ? homeSea.surface : (homeBridge ? homeBridge.y : null),
+      jumpT: 0,
+      jumpMax: 1.0,
+      jumpFrom: cfg.x,
+      jumpTo: cfg.x,
+      lift: 0,
+      hops: 0,
+      steamT: 0,
+      steamMax: 0.85,
+      steamHit: true,
+      steamBurst: 0,
+      // the trio of the glade: a wind-up, and what it is winding up for
+      castT: 0,
+      castMax: 0.9,
+      spell: null,
+      spellCd: 0,
+      kissT: 0,
+      hover: 0,
+      rage: 0,
+    };
+  }
+
   initWilds() {
     const L = this.level;
     const dogs = (L.dogs || []).map((d, i) => ({
@@ -2490,67 +2575,40 @@ export class Game {
       dir: i % 2 ? -1 : 1,
       moving: false,
     }));
-    const cfg = L.boss;
-    const kind = cfg && cfg.kind ? cfg.kind : 'scorpion';
-    const BOSS_HP = { giant: 240, tiger: 200, dragon: 160, scorpion: 160 };
-    const BOSS_NAME = {
-      giant: 'THE SNOW GIANT', tiger: 'THE TIGER OF THE RUINS',
-      dragon: 'THE WATER DRAGON', scorpion: 'THE SCORPION',
-    };
-    const BOSS_SUBTITLE = {
-      giant: 'THE PASS ITSELF', tiger: 'WHAT THE FIRE LEFT BEHIND',
-      dragon: 'KEEPER OF THE LAST BRIDGE', scorpion: 'THE OLD KEEPER OF THE DUNES',
-    };
-    const BOSS_COLOR = {
-      giant: '#b9dff2', tiger: '#e8a34a', dragon: '#8fe0d8', scorpion: '#d28a52',
-    };
-    const homeBridge = cfg && kind === 'dragon' && L.bridges
-      ? L.bridges[cfg.bridge ?? L.bridges.length - 1] : null;
-    const homeSea = cfg && kind === 'dragon' && L.seas && L.seas.length
-      ? L.seas[0] : null;
-    const boss = cfg ? {
-      id: kind,
-      kind,
-      name: cfg.name || BOSS_NAME[kind],
-      subtitle: cfg.subtitle || BOSS_SUBTITLE[kind],
-      color: cfg.color || BOSS_COLOR[kind],
-      x: cfg.x,
-      hp: cfg.hp || BOSS_HP[kind],
-      maxHp: cfg.hp || BOSS_HP[kind],
+    // Rats come up out of the snow and out of the drains.
+    const rats = (L.rats || []).map((d, i) => ({
+      id: `rat-${i}`,
+      kind: d.kind || L.ratKind || 'sewage',
+      x: d.home ?? d.x,
+      home: d.home ?? d.x,
+      hp: 3,
+      maxHp: 3,
       alive: true,
-      active: false,
-      intro: 0,
       flash: 0,
-      attackCd: 1.8,
-      stingT: 0,
-      stingMax: 0.95,
-      stingX: cfg.x,
-      stingHit: true,
-      clawT: 0,
-      clawMax: 0.55,
-      clawHit: true,
-      slamT: 0,
-      slamMax: 1.0,
-      slamX: cfg.x,
-      slamHit: true,
-      facing: -1,
-      stomp: 0,
-      // the tiger crouches and pounces; the dragon hops its bridge and breathes
-      pounceT: 0,
-      pounceMax: 0.55,
-      pounceX: cfg.x,
-      baseY: homeSea ? homeSea.surface : (homeBridge ? homeBridge.y : null),
-      jumpT: 0,
-      jumpMax: 1.0,
-      jumpFrom: cfg.x,
-      jumpTo: cfg.x,
-      lift: 0,
-      hops: 0,
-      steamT: 0,
-      steamMax: 0.85,
-      steamHit: true,
-      steamBurst: 0,
-    } : null;
+      biteCd: 0.5 + (i % 5) * 0.15,
+      pause: 0,
+      dir: i % 2 ? -1 : 1,
+      moving: false,
+    }));
+    // Little elves that keep their distance and curse her from the flowers.
+    const elves = (L.elves || []).map((d, i) => ({
+      id: `elf-${i}`,
+      variant: d.variant ?? (i % 6),
+      x: d.home ?? d.x,
+      home: d.home ?? d.x,
+      hp: 5,
+      maxHp: 5,
+      alive: true,
+      flash: 0,
+      castT: 0,
+      castCd: 1.2 + (i % 4) * 0.4,
+      pause: 0,
+      dir: i % 2 ? -1 : 1,
+      moving: false,
+    }));
+    // A glade can hold more than one keeper: they come one after another.
+    const queue = L.bosses && L.bosses.length ? L.bosses : (L.boss ? [L.boss] : []);
+    const boss = queue.length ? this.makeBoss(queue[0]) : null;
     // Her life is hers for the whole road: a new stage does not mend her.
     this.lifeMax = 100;
     const startHP = this.lifeHP == null
@@ -2569,7 +2627,16 @@ export class Game {
       dogs,
       spiders,
       crabs,
+      rats,
+      elves,
       boss,
+      // Everyone still waiting in this glade, and whose turn it is.
+      bossQueue: queue.slice(1),
+      bossTotal: queue.length,
+      bolts: [],
+      waves: [],
+      storms: [],
+      clones: [],
       bossDefeated: false,
       bossStarted: false,
       shards: [],
@@ -2588,10 +2655,21 @@ export class Game {
     b.active = true;
     b.intro = 1.6;
     b.attackCd = 1.7;
+    b.spellCd = 1.7;
+    b.castT = 0;
+    b.kissT = 0;
+    b.rage = 0;
     this.card = null;
     this.player.facing = 1;
     this.audio.play('power');
-    const pale = b.kind === 'giant';
+    const tint = {
+      giant: ['#b9dff2', '#f4fbff'],
+      tiger: ['#d4a06a', '#f4d9a8'],
+      dragon: ['#8fe0d8', '#e8fffb'],
+      fairy: ['#a8f08a', '#efffdc'],
+      love: ['#ff9ac8', '#fff0f8'],
+      ocean: ['#7fd8ff', '#e8fbff'],
+    }[b.kind] || ['#d4a06a', '#f4d9a8'];
     for (let i = 0; i < 44; i++) {
       const a = Math.random() * TAU;
       const sp = 14 + Math.random() * 58;
@@ -2602,9 +2680,7 @@ export class Game {
         vx: Math.cos(a) * sp,
         vy: Math.sin(a) * sp * 0.4 - 12,
         size: Math.random() < 0.2 ? 2 : 1,
-        color: pale
-          ? (i % 3 ? '#b9dff2' : '#f4fbff')
-          : (i % 3 ? '#d4a06a' : '#f4d9a8'),
+        color: i % 3 ? tint[0] : tint[1],
         max: 0.6 + Math.random() * 0.9,
         grav: 42,
         drag: 0.95,
@@ -2740,6 +2816,87 @@ export class Game {
       spider.x = clamp(spider.x, 16, L.width - 16);
     }
 
+    // Rats: they run in short bursts, stop dead, and try again. No patience.
+    for (const rat of c.rats) {
+      rat.flash = Math.max(0, rat.flash - dt * 4);
+      rat.biteCd = Math.max(0, rat.biteCd - dt);
+      if (!rat.alive) continue;
+      const gy = groundAt(L, rat.x);
+      const dx = p.x - rat.x;
+      const close = Math.abs(dx) < 150 && Math.abs(p.y - gy) < 34;
+      if (close) {
+        rat.moving = true;
+        rat.dir = Math.sign(dx) || rat.dir;
+        rat.x += rat.dir * 56 * dt * foeSpeed(rat);
+        if (Math.abs(dx) < 18 && Math.abs(p.y - gy) < 22 && rat.biteCd <= 0) {
+          this.audio.play('dogBite');
+          this.hurtWilds(5, rat.x);
+          rat.biteCd = 0.95;
+        }
+      } else {
+        rat.pause -= dt;
+        if (rat.pause <= 0) {
+          if (Math.abs(rat.x - rat.home) > 40) rat.dir = Math.sign(rat.home - rat.x) || rat.dir;
+          else {
+            rat.dir = Math.random() < 0.5 ? -1 : 1;
+            rat.pause = 0.5 + Math.random() * 0.9;
+          }
+        }
+        rat.x += rat.dir * 22 * dt * foeSpeed(rat);
+        rat.moving = true;
+      }
+      rat.x = clamp(rat.x, 16, L.width - 16);
+    }
+
+    // The little elves will not be touched. They keep their distance, raise a
+    // hand, and send a spore of green light down the road after her.
+    for (const elf of c.elves) {
+      elf.flash = Math.max(0, elf.flash - dt * 4);
+      elf.castT = Math.max(0, elf.castT - dt);
+      elf.castCd = Math.max(0, elf.castCd - dt);
+      if (!elf.alive) continue;
+      const gy = groundAt(L, elf.x);
+      const dx = p.x - elf.x;
+      const ad = Math.abs(dx);
+      elf.moving = false;
+      if (ad < 230 && Math.abs(p.y - gy) < 52) {
+        elf.dir = Math.sign(dx) || elf.dir;
+        if (ad < 66) {
+          elf.moving = true;
+          elf.x -= elf.dir * 34 * dt * foeSpeed(elf);
+        } else if (ad > 175) {
+          elf.moving = true;
+          elf.x += elf.dir * 20 * dt * foeSpeed(elf);
+        }
+        if (elf.castCd <= 0) {
+          elf.castT = 0.45;
+          elf.castCd = 2.1 + Math.random() * 0.9;
+          const ex = elf.x + elf.dir * 6;
+          const ey = gy - 14;
+          const ty = p.y - 10;
+          const a = Math.atan2(ty - ey, p.x - ex);
+          this.addBolt({
+            kind: 'spore', x: ex, y: ey,
+            vx: Math.cos(a) * 96, vy: Math.sin(a) * 96,
+            dmg: 5, r: 3, max: 3.4,
+          });
+          this.audio.play('spiderHiss');
+        }
+      } else {
+        elf.pause -= dt;
+        if (elf.pause <= 0) {
+          if (Math.abs(elf.x - elf.home) > 40) elf.dir = Math.sign(elf.home - elf.x) || elf.dir;
+          else {
+            elf.dir = Math.random() < 0.5 ? -1 : 1;
+            elf.pause = 1 + Math.random() * 1.4;
+          }
+        }
+        elf.x += elf.dir * 13 * dt * foeSpeed(elf);
+        elf.moving = true;
+      }
+      elf.x = clamp(elf.x, 16, L.width - 16);
+    }
+
     for (const beam of c.guardianLasers) {
       beam.t += dt;
       beam.x = beam.target.x;
@@ -2755,8 +2912,12 @@ export class Game {
       if (c.boss.kind === 'giant') this.updateGiant(dt);
       else if (c.boss.kind === 'tiger') this.updateTiger(dt);
       else if (c.boss.kind === 'dragon') this.updateDragon(dt);
+      else if (c.boss.kind === 'fairy') this.updateFairy(dt);
+      else if (c.boss.kind === 'love') this.updateLove(dt);
+      else if (c.boss.kind === 'ocean') this.updateOcean(dt);
       else this.updateScorpion(dt);
     }
+    this.updateBossWard(dt);
 
     if (this.input.consume('shard')) this.throwWildsShards();
     c.beamDir = p.facing || 1;
@@ -2764,6 +2925,8 @@ export class Game {
       c.dogs.some((dog) => dog.alive)
       || c.spiders.some((spider) => spider.alive)
       || c.crabs.some((crab) => crab.alive)
+      || c.rats.some((rat) => rat.alive)
+      || c.elves.some((elf) => elf.alive)
       || (c.boss && c.boss.active && c.boss.alive)
     );
     this.audio.setBeam(c.beamOn);
@@ -3146,6 +3309,366 @@ export class Game {
     }
   }
 
+  // ---- the glade's three keepers -----------------------------------------
+
+  addBolt(opts) {
+    const c = this.combat;
+    if (!c) return;
+    c.bolts.push({
+      kind: 'spore', x: 0, y: 0, vx: 0, vy: 0, dmg: 5, r: 3, life: 0, max: 4, grav: 0, ...opts,
+    });
+  }
+
+  // Every bolt, wave, tornado and borrowed double the glade's keepers throw.
+  updateBossWard(dt) {
+    const c = this.combat;
+    if (!c) return;
+    const L = this.level;
+    const p = this.player;
+    const hurtY = p.y - 9;
+
+    // the fairy's shadow clones drift, and shoot on their own clock
+    for (const clone of c.clones) {
+      clone.t += dt;
+      clone.cd = Math.max(0, clone.cd - dt);
+      clone.x += Math.sin(clone.t * 1.4 + clone.seed) * 14 * dt;
+      if (clone.cd <= 0 && Math.abs(p.x - clone.x) < 330) {
+        clone.cd = 2.3;
+        const ey = groundAt(L, clone.x) - 40;
+        const a = Math.atan2(hurtY - ey, p.x - clone.x);
+        this.addBolt({
+          kind: 'arrow', x: clone.x, y: ey,
+          vx: Math.cos(a) * 190, vy: Math.sin(a) * 190,
+          dmg: 5, r: 3, max: 3.4, grav: 40,
+        });
+      }
+    }
+    c.clones = c.clones.filter((clone) => clone.t < clone.dur);
+
+    const keep = [];
+    for (const bolt of c.bolts) {
+      bolt.life += dt;
+      if (bolt.kind === 'heart') {
+        // love follows her, at least a little
+        const a = Math.atan2(hurtY - bolt.y, p.x - bolt.x);
+        bolt.vx = lerp(bolt.vx, Math.cos(a) * 112, Math.min(1, dt * 1.3));
+        bolt.vy = lerp(bolt.vy, Math.sin(a) * 112, Math.min(1, dt * 1.3));
+      }
+      bolt.vy += (bolt.grav || 0) * dt;
+      bolt.x += bolt.vx * dt;
+      bolt.y += bolt.vy * dt;
+      const gy = groundAt(L, clamp(bolt.x, 0, L.width - 1));
+      let dead = bolt.life > (bolt.max || 4);
+      if (bolt.grav && bolt.y > gy - 2) {
+        dead = true;
+        this.puffBolt(bolt, gy - 2);
+      }
+      if (!dead && Math.abs(bolt.x - p.x) < 7 + bolt.r && Math.abs(bolt.y - hurtY) < 12 + bolt.r) {
+        dead = true;
+        this.puffBolt(bolt, bolt.y);
+        this.hurtWilds(bolt.dmg, bolt.x);
+      }
+      if (!dead) keep.push(bolt);
+    }
+    c.bolts = keep;
+
+    // the great waves roll along the glade floor: jump them, or go down
+    for (const wave of c.waves) {
+      wave.t += dt;
+      wave.x += wave.dir * wave.speed * dt;
+      if (!wave.hit && Math.abs(wave.x - p.x) < 16) {
+        const deckY = groundAt(L, p.x);
+        const airborne = !p.onGround && p.y < deckY - 12;
+        if (!airborne) {
+          wave.hit = true;
+          this.hurtWilds(wave.dmg, wave.x);
+        }
+      }
+    }
+    const arena = L.boss || { arenaMin: 0, arenaMax: L.width };
+    c.waves = c.waves.filter((wave) => wave.t < 6
+      && wave.x > arena.arenaMin - 140 && wave.x < arena.arenaMax + 140);
+
+    // tornadoes wander toward her and keep chewing
+    for (const storm of c.storms) {
+      storm.t += dt;
+      storm.cd = Math.max(0, storm.cd - dt);
+      const dir = Math.sign(p.x - storm.x) || 1;
+      storm.x += dir * 32 * dt * foeSpeed(storm);
+      if (storm.cd <= 0 && Math.abs(p.x - storm.x) < 26
+        && Math.abs(p.y - groundAt(L, p.x)) < 70) {
+        storm.cd = 0.7;
+        this.hurtWilds(5, storm.x);
+      }
+    }
+    c.storms = c.storms.filter((storm) => storm.t < storm.dur);
+  }
+
+  puffBolt(bolt, y) {
+    const color = {
+      arrow: '#b6ff9a', fireball: '#ffb055', heart: '#ff9ac8',
+      kiss: '#ff6f91', fish: '#9fe0ff', spore: '#c8ff9a',
+    }[bolt.kind] || '#ffffff';
+    for (let i = 0; i < 8; i++) {
+      const a = Math.random() * TAU;
+      const sp = 14 + Math.random() * 46;
+      this.spawn({
+        type: 'spark',
+        x: bolt.x,
+        y,
+        vx: Math.cos(a) * sp,
+        vy: Math.sin(a) * sp - 10,
+        size: i % 3 ? 1 : 2,
+        color: i % 2 ? color : '#ffffff',
+        max: 0.25 + Math.random() * 0.35,
+        grav: 40,
+        drag: 0.93,
+      });
+    }
+  }
+
+  // THE FOREST FAIRY: poisoned arrows out of the sky, one enormous fire ball,
+  // and doubles of herself that keep shooting.
+  updateFairy(dt) {
+    const c = this.combat;
+    const b = c.boss;
+    const L = this.level;
+    const p = this.player;
+    b.flash = Math.max(0, b.flash - dt * 3.8);
+    b.stomp = Math.max(0, b.stomp - dt);
+    b.intro = Math.max(0, b.intro - dt);
+    b.x = clamp(b.x, L.boss.arenaMin + 36, Math.min(L.boss.arenaMax - 36, L.width - 46));
+    b.facing = Math.sign(p.x - b.x) || b.facing;
+    b.hover = 26 + Math.sin(this.time * 2.2) * 5;
+    if (b.intro > 0) return;
+
+    if (b.castT > 0) {
+      b.castT = Math.max(0, b.castT - dt);
+      b.hover = 32;
+      if (b.castT <= 0) this.fairyCast(b);
+      return;
+    }
+
+    const dx = p.x - b.x;
+    const ad = Math.abs(dx);
+    b.hover = 24 + Math.sin(this.time * 2.2) * 4;
+    if (ad > 215) b.x += Math.sign(dx) * 30 * dt * foeSpeed(b);
+    else if (ad < 105) b.x -= Math.sign(dx) * 26 * dt * foeSpeed(b);
+
+    b.spellCd -= dt * foeSpeed(b);
+    if (b.spellCd <= 0) {
+      const roll = Math.random();
+      b.spell = roll < 0.4 ? 'arrows' : roll < 0.72 ? 'fire' : 'clone';
+      b.castT = b.castMax = b.spell === 'fire' ? 1.15 : 0.85;
+      b.spellCd = 2.2 + Math.random() * 0.9;
+      this.audio.play(b.spell === 'fire' ? 'blueCharge' : 'spiderHiss');
+    }
+  }
+
+  fairyCast(b) {
+    const c = this.combat;
+    const L = this.level;
+    const p = this.player;
+    if (b.spell === 'arrows') {
+      // a poisoned rain over the whole glade, and nowhere to stand is safe
+      const from = Math.max(L.boss.arenaMin + 16, p.x - 210);
+      const to = Math.min(L.boss.arenaMax - 16, p.x + 210);
+      const n = 9;
+      for (let i = 0; i < n; i++) {
+        const x = lerp(from, to, i / (n - 1)) + (Math.random() - 0.5) * 24;
+        this.addBolt({
+          kind: 'arrow', x, y: -24 - Math.random() * 70,
+          vx: (Math.random() - 0.5) * 14, vy: 150 + Math.random() * 90,
+          dmg: 6, r: 3, max: 4, grav: 130,
+        });
+      }
+      this.audio.play('spiderHiss');
+    } else if (b.spell === 'fire') {
+      // FIRE BALL JUTSU: one ball, the size of a house, straight down the glade
+      const ey = groundAt(L, b.x) - 36;
+      const a = Math.atan2((p.y - 12) - ey, p.x - b.x);
+      this.addBolt({
+        kind: 'fireball', x: b.x + b.facing * 16, y: ey,
+        vx: Math.cos(a) * 116, vy: Math.sin(a) * 116,
+        dmg: 18, r: 20, max: 6,
+      });
+      this.audio.play('blast');
+      for (let i = 0; i < 20; i++) {
+        const ang = Math.random() * TAU;
+        const sp = 16 + Math.random() * 60;
+        this.spawn({
+          type: 'spark',
+          x: b.x + b.facing * 16,
+          y: ey,
+          vx: Math.cos(ang) * sp,
+          vy: Math.sin(ang) * sp,
+          size: i % 4 ? 1 : 2,
+          color: i % 2 ? '#ffb055' : '#fff0c0',
+          max: 0.4 + Math.random() * 0.5,
+          drag: 0.93,
+        });
+      }
+    } else {
+      // SHADOW CLONE JUTSU
+      for (let i = 0; i < 2; i++) {
+        c.clones.push({
+          x: clamp(b.x + (i ? 58 : -58), L.boss.arenaMin + 30, L.boss.arenaMax - 30),
+          t: 0,
+          dur: 6.5,
+          cd: 0.7 + i * 0.5,
+          seed: i * 2.3 + 1,
+        });
+      }
+      this.audio.play('power');
+      for (let i = 0; i < 26; i++) {
+        const a = Math.random() * TAU;
+        const sp = 10 + Math.random() * 44;
+        this.spawn({
+          type: 'smoke',
+          x: b.x + (Math.random() - 0.5) * 60,
+          y: groundAt(L, b.x) - 30 - Math.random() * 20,
+          vx: Math.cos(a) * sp,
+          vy: Math.sin(a) * sp * 0.7 - 6,
+          size: 2 + Math.floor(Math.random() * 3),
+          color: '#3f7a44',
+          max: 0.7 + Math.random() * 0.7,
+          alpha: 0.5,
+          drag: 0.94,
+        });
+      }
+    }
+    b.spell = null;
+  }
+
+  // THE LOVE GODDESS: her heart, thrown, and her kisses, which are poisoned.
+  updateLove(dt) {
+    const c = this.combat;
+    const b = c.boss;
+    const L = this.level;
+    const p = this.player;
+    b.flash = Math.max(0, b.flash - dt * 3.8);
+    b.stomp = Math.max(0, b.stomp - dt);
+    b.intro = Math.max(0, b.intro - dt);
+    b.kissT = Math.max(0, (b.kissT || 0) - dt);
+    b.x = clamp(b.x, L.boss.arenaMin + 30, Math.min(L.boss.arenaMax - 30, L.width - 44));
+    b.facing = Math.sign(p.x - b.x) || b.facing;
+    b.hover = 4 + Math.sin(this.time * 1.6) * 2;
+    if (b.intro > 0) return;
+
+    if (b.castT > 0) {
+      b.castT = Math.max(0, b.castT - dt);
+      if (b.castT <= 0) this.loveCast(b);
+      return;
+    }
+
+    const dx = p.x - b.x;
+    const ad = Math.abs(dx);
+    if (ad > 170) b.x += Math.sign(dx) * 24 * dt * foeSpeed(b);
+    else if (ad < 90) b.x -= Math.sign(dx) * 20 * dt * foeSpeed(b);
+
+    b.spellCd -= dt * foeSpeed(b);
+    if (b.spellCd <= 0) {
+      b.spell = Math.random() < 0.55 ? 'hearts' : 'kiss';
+      b.castT = b.castMax = 0.8;
+      b.spellCd = 1.9 + Math.random() * 0.9;
+      this.audio.play('blueCharge');
+    }
+  }
+
+  loveCast(b) {
+    const L = this.level;
+    const p = this.player;
+    const ey = groundAt(L, b.x) - 46;
+    if (b.spell === 'hearts') {
+      // shooting love: three hearts in a fan
+      for (let i = -1; i <= 1; i++) {
+        const a = Math.atan2((p.y - 10) - ey, p.x - b.x) + i * 0.26;
+        this.addBolt({
+          kind: 'heart', x: b.x + b.facing * 10, y: ey,
+          vx: Math.cos(a) * 104, vy: Math.sin(a) * 104,
+          dmg: 7, r: 5, max: 4.8,
+        });
+      }
+      this.audio.play('memory');
+    } else {
+      // a poisoned kiss, thrown underhand so it arcs
+      b.kissT = 0.45;
+      const a = Math.atan2((p.y - 16) - ey, p.x - b.x) - 0.2;
+      this.addBolt({
+        kind: 'kiss', x: b.x + b.facing * 10, y: ey,
+        vx: Math.cos(a) * 140, vy: Math.sin(a) * 140,
+        dmg: 9, r: 5, max: 3.4, grav: 80,
+      });
+      this.audio.play('spiderHiss');
+    }
+    b.spell = null;
+  }
+
+  // THE OCEAN RAGE GOD: the great wave, the tornado, and a sky of fish.
+  updateOcean(dt) {
+    const c = this.combat;
+    const b = c.boss;
+    const L = this.level;
+    const p = this.player;
+    b.flash = Math.max(0, b.flash - dt * 3.8);
+    b.stomp = Math.max(0, b.stomp - dt);
+    b.intro = Math.max(0, b.intro - dt);
+    b.rage = b.castT > 0 ? 1 : Math.max(0, (b.rage || 0) - dt * 1.6);
+    b.x = clamp(b.x, L.boss.arenaMin + 34, Math.min(L.boss.arenaMax - 34, L.width - 46));
+    b.facing = Math.sign(p.x - b.x) || b.facing;
+    b.hover = 0;
+    if (b.intro > 0) return;
+
+    if (b.castT > 0) {
+      b.castT = Math.max(0, b.castT - dt);
+      if (b.castT <= 0) this.oceanCast(b);
+      return;
+    }
+
+    const dx = p.x - b.x;
+    const ad = Math.abs(dx);
+    if (ad > 155) b.x += Math.sign(dx) * 22 * dt * foeSpeed(b);
+    else if (ad < 80) b.x -= Math.sign(dx) * 16 * dt * foeSpeed(b);
+
+    b.spellCd -= dt * foeSpeed(b);
+    if (b.spellCd <= 0) {
+      const roll = Math.random();
+      b.spell = roll < 0.4 ? 'wave' : roll < 0.7 ? 'storm' : 'fish';
+      b.castT = b.castMax = 0.95;
+      b.spellCd = 2.3 + Math.random() * 1.0;
+      this.audio.play('blueCharge');
+    }
+  }
+
+  oceanCast(b) {
+    const c = this.combat;
+    const L = this.level;
+    const p = this.player;
+    if (b.spell === 'wave') {
+      c.waves.push({
+        x: b.x + b.facing * 20, dir: b.facing, speed: 150, dmg: 14, t: 0, hit: false,
+      });
+      this.audio.play('blast');
+    } else if (b.spell === 'storm') {
+      c.storms.push({ x: b.x + b.facing * 50, t: 0, dur: 5.5, cd: 0.5 });
+      this.audio.play('blueCharge');
+    } else {
+      // rain of fishes
+      const from = Math.max(L.boss.arenaMin + 16, p.x - 200);
+      const to = Math.min(L.boss.arenaMax - 16, p.x + 200);
+      for (let i = 0; i < 10; i++) {
+        const x = lerp(from, to, i / 9) + (Math.random() - 0.5) * 26;
+        this.addBolt({
+          kind: 'fish', x, y: -30 - Math.random() * 80,
+          vx: (Math.random() - 0.5) * 20, vy: 130 + Math.random() * 80,
+          dmg: 7, r: 4, max: 4.5, grav: 150,
+        });
+      }
+      this.audio.play('whale');
+    }
+    b.spell = null;
+  }
+
   hurtWilds(amount, sourceX) {
     const c = this.combat;
     if (!c || c.invuln > 0 || this.mode === 'ending') return false;
@@ -3241,6 +3764,8 @@ export class Game {
       for (const dog of c.dogs) consider(dog);
       for (const spider of c.spiders) consider(spider);
       for (const crab of c.crabs) consider(crab);
+      for (const rat of c.rats) consider(rat);
+      for (const elf of c.elves) consider(elf);
       if (!best) continue;
       this.guardianStrike(best);
       gd.sweepCd = 1.1 + i * 0.2;
@@ -3279,6 +3804,22 @@ export class Game {
       if (d < best) {
         best = d;
         target = crab;
+      }
+    }
+    for (const rat of c.rats) {
+      if (!rat.alive) continue;
+      const d = Math.abs(rat.x - p.x);
+      if (d < best) {
+        best = d;
+        target = rat;
+      }
+    }
+    for (const elf of c.elves) {
+      if (!elf.alive) continue;
+      const d = Math.abs(elf.x - p.x);
+      if (d < best) {
+        best = d;
+        target = elf;
       }
     }
     if (c.boss && c.boss.active && c.boss.alive) {
@@ -3369,6 +3910,18 @@ export class Game {
         this.damageWilds(crab, 6, crab.x, groundAt(L, crab.x) - 10);
       }
     }
+    for (const rat of c.rats) {
+      if (!rat.alive) continue;
+      if (inLine(rat.x) && inBand(groundAt(L, rat.x) - 8)) {
+        this.damageWilds(rat, 6, rat.x, groundAt(L, rat.x) - 8);
+      }
+    }
+    for (const elf of c.elves) {
+      if (!elf.alive) continue;
+      if (inLine(elf.x) && inBand(groundAt(L, elf.x) - 14)) {
+        this.damageWilds(elf, 6, elf.x, groundAt(L, elf.x) - 14);
+      }
+    }
     if (bossFocus && Math.abs(c.boss.x - p.x) < 620) {
       this.damageWilds(c.boss, 3, c.boss.x - 12, this.bossAimY(c.boss));
     }
@@ -3383,6 +3936,9 @@ export class Game {
     }
     if (boss.kind === 'giant') return groundAt(L, boss.x) - 48;
     if (boss.kind === 'tiger') return groundAt(L, boss.x) - 34;
+    if (boss.kind === 'fairy') return groundAt(L, boss.x) - 34 - (boss.hover || 0);
+    if (boss.kind === 'love') return groundAt(L, boss.x) - 44 - (boss.hover || 0);
+    if (boss.kind === 'ocean') return groundAt(L, boss.x) - 40;
     return groundAt(L, boss.x) - 28;
   }
 
@@ -3446,13 +4002,20 @@ export class Game {
     const b = c.boss;
     b.alive = false;
     b.active = false;
-    c.bossDefeated = true;
     c.beamOn = false;
     this.audio.setBeam(false);
     c.shards.length = 0;
+    c.bolts.length = 0;
+    c.waves.length = 0;
+    c.storms.length = 0;
+    c.clones.length = 0;
     const giant = b.kind === 'giant';
     const tiger = b.kind === 'tiger';
     const dragon = b.kind === 'dragon';
+    const burst = {
+      giant: '#cfeaff', tiger: '#e0a060', dragon: '#8fe0d8',
+      fairy: '#a8f08a', love: '#ff9ac8', ocean: '#7fd8ff',
+    }[b.kind] || '#e0a060';
     this.audio.play('blast');
     for (let i = 0; i < 64; i++) {
       const a = Math.random() * TAU;
@@ -3464,14 +4027,18 @@ export class Game {
         vx: Math.cos(a) * sp,
         vy: Math.sin(a) * sp - 16,
         size: i % 4 === 0 ? 2 : 1,
-        color: i % 3
-          ? (giant ? '#cfeaff' : '#e0a060')
-          : (giant ? '#ffffff' : '#fff0d0'),
+        color: i % 3 ? burst : '#ffffff',
         max: 0.7 + Math.random() * 0.9,
         grav: 24,
         drag: 0.95,
       });
     }
+    // A glade that holds more than one keeper is not finished being held.
+    if (c.bossQueue && c.bossQueue.length) {
+      this.nextGladeKeeper();
+      return;
+    }
+    c.bossDefeated = true;
     if (giant && !this.powers.has('glide')) {
       this.grantPowers(
         ['glide'],
@@ -3495,6 +4062,48 @@ export class Game {
       };
     }
     // The boss is down. The peddler waits where the next road begins.
+  }
+
+  // The next one steps out of the green before the last one has stopped
+  // falling. One arena, three turns.
+  nextGladeKeeper() {
+    const c = this.combat;
+    const L = this.level;
+    const next = c.bossQueue.shift();
+    if (!next) return;
+    const b = this.makeBoss(next);
+    b.active = true;
+    b.intro = 1.9;
+    b.attackCd = 1.6;
+    b.spellCd = 1.8;
+    b.facing = -1;
+    b.x = clamp(next.x, L.boss.arenaMin + 40, L.boss.arenaMax - 40);
+    c.boss = b;
+    c.bossDefeated = false;
+    this.player.facing = 1;
+    this.card = {
+      numeral: ['I', 'II', 'III', 'IV'][c.bossTotal - 1 - c.bossQueue.length] || 'I',
+      title: b.name || 'THE NEXT KEEPER',
+      t: 0,
+      dur: 4.2,
+    };
+    this.audio.play('power');
+    for (let i = 0; i < 46; i++) {
+      const a = Math.random() * TAU;
+      const sp = 12 + Math.random() * 66;
+      this.spawn({
+        type: i % 3 ? 'mote' : 'smoke',
+        x: b.x + (Math.random() - 0.5) * 80,
+        y: groundAt(L, b.x) - Math.random() * 40,
+        vx: Math.cos(a) * sp,
+        vy: Math.sin(a) * sp * 0.5 - 14,
+        size: 1 + Math.floor(Math.random() * 2),
+        color: i % 3 ? (b.color || '#ffffff') : '#ffffff',
+        max: 0.6 + Math.random() * 1.0,
+        grav: 26,
+        drag: 0.95,
+      });
+    }
   }
 
   showWildsDown() {
@@ -3543,6 +4152,14 @@ export class Game {
           'THE RUINS WILL KEEP HER THIS TIME.',
         ],
       },
+      jungle: {
+        name: 'THE VERDANT WILDS',
+        lines: [
+          'THE GLADE CLOSES OVER HER, LEAF BY LEAF.',
+          'SOMEWHERE IN THE GREEN, THREE OF THEM ARE STILL STANDING.',
+          'THE FOREST WILL KEEP HER THIS TIME.',
+        ],
+      },
       cliffs: {
         name: 'THE GREEN CLIFFS',
         lines: [
@@ -3574,12 +4191,12 @@ export class Game {
     this.combat = null;
     this.mode = 'ending';
     this.ending = {
-      name: 'THE GREEN CLIFFS',
+      name: 'THE VERDANT WILDS',
       continued: true,
       lines: [
-        'THE BRIDGES HOLD. THE CLIFFS GO ON, GREEN AND PATIENT.',
-        'SHE DOES NOT LOOK BACK AT THE DESERT.',
-        'BELOW, THE WHALE IS ONLY A SHADOW AGAIN.',
+        'THE FAIRY FALLS. THE LADY FALLS. THE SEA GOES QUIET.',
+        'THE FOREST LETS HER WALK OUT OF IT, FLOWER BY FLOWER.',
+        'THE AIR IS WARM. NOTHING LEFT IN IT WANTS HER DEAD.',
         'THE ROAD ENDS HERE — FOR NOW.',
       ],
       count: this.found.size,
@@ -3588,7 +4205,7 @@ export class Game {
     };
     this.fade = 1;
     this.fadeTarget = 0;
-    this.audio.applyBiome('cliffs');
+    this.audio.applyBiome('jungle');
     this.audio.play('ending');
   }
 
@@ -4819,6 +5436,60 @@ export class Game {
             }
             g.restore();
           }
+        } else if (boss.kind === 'fairy') {
+          const gy = groundAt(L, boss.x);
+          const cast = boss.castT > 0 ? 1 - boss.castT / boss.castMax : 0;
+          drawForestFairy(g, bx, gy, this.time, {
+            scale: 1.1,
+            facing: boss.facing,
+            flash: boss.flash,
+            cast,
+            hover: boss.hover || 24,
+          });
+          // her doubles: faint, and shooting all the same
+          for (const clone of c.clones) {
+            const cx2 = clone.x - this.cam.x;
+            if (cx2 < -80 || cx2 > W + 80) continue;
+            g.save();
+            g.globalAlpha = 0.42 * clamp(1 - clone.t / clone.dur, 0, 1);
+            drawForestFairy(g, cx2, groundAt(L, clone.x), this.time + clone.seed, {
+              scale: 1.06,
+              facing: boss.facing,
+              hover: 24 + Math.sin(this.time * 2 + clone.seed) * 4,
+            });
+            g.restore();
+          }
+          if (boss.castT > 0 && boss.spell === 'fire') {
+            const k = 1 - boss.castT / boss.castMax;
+            g.save();
+            g.globalCompositeOperation = 'lighter';
+            glow(g, bx + boss.facing * 12, gy - 34 - (boss.hover || 0), 18 + k * 30, '#ffb055', 0.35 + k * 0.5);
+            g.restore();
+          }
+        } else if (boss.kind === 'love') {
+          drawLoveGoddess(g, bx, groundAt(L, boss.x), this.time, {
+            scale: 1.12,
+            facing: boss.facing,
+            flash: boss.flash,
+            cast: boss.castT > 0 ? 1 - boss.castT / boss.castMax : 0,
+            kiss: boss.kissT > 0 ? clamp(boss.kissT / 0.45, 0, 1) : 0,
+          });
+          if (boss.castT > 0) {
+            const k = 1 - boss.castT / boss.castMax;
+            const gy = groundAt(L, boss.x);
+            g.save();
+            g.globalCompositeOperation = 'lighter';
+            glow(g, bx + boss.facing * 16, gy - 50, 16 + k * 24, '#ff9ac8', 0.35 + k * 0.45);
+            g.restore();
+          }
+        } else if (boss.kind === 'ocean') {
+          drawOceanGod(g, bx, groundAt(L, boss.x), this.time, {
+            scale: 1.14,
+            facing: boss.facing,
+            flash: boss.flash,
+            cast: boss.castT > 0 ? 1 - boss.castT / boss.castMax : 0,
+            rage: boss.rage || 0,
+          });
         } else {
           drawScorpion(g, bx, groundAt(L, boss.x), this.time, {
             scale: 1.08,
@@ -4902,12 +5573,101 @@ export class Game {
       });
     }
 
+    for (const rat of c.rats) {
+      if (!rat.alive) continue;
+      const sx = rat.x - this.cam.x;
+      if (sx < -60 || sx > W + 60) continue;
+      drawRat(g, sx, groundAt(L, rat.x), this.time, {
+        kind: rat.kind,
+        facing: rat.dir,
+        flash: rat.flash,
+        moving: rat.moving,
+        run: rat.x * 0.02,
+      });
+    }
+
+    for (const elf of c.elves) {
+      if (!elf.alive) continue;
+      const sx = elf.x - this.cam.x;
+      if (sx < -40 || sx > W + 40) continue;
+      drawElf(g, sx, groundAt(L, elf.x), this.time, {
+        variant: elf.variant,
+        facing: elf.dir,
+        flash: elf.flash,
+        casting: elf.castT > 0 ? clamp(elf.castT / 0.45, 0, 1) : 0,
+        run: elf.x * 0.01,
+      });
+    }
+
+    // the great waves, rolling along the glade floor
+    for (const wave of c.waves) {
+      const wx = wave.x - this.cam.x;
+      if (wx < -140 || wx > W + 140) continue;
+      const gy = groundAt(L, clamp(wave.x, 0, L.width - 1));
+      const fade = clamp(1 - wave.t / 6, 0, 1);
+      g.save();
+      g.globalAlpha = fade;
+      const dir = wave.dir || 1;
+      g.fillStyle = 'rgba(52,140,180,0.5)';
+      g.beginPath();
+      g.moveTo(wx - dir * 46, gy + 2);
+      g.quadraticCurveTo(wx - dir * 20, gy - 46, wx + dir * 10, gy - 30);
+      g.quadraticCurveTo(wx + dir * 18, gy - 18, wx + dir * 16, gy + 2);
+      g.closePath();
+      g.fill();
+      g.fillStyle = 'rgba(150,232,255,0.55)';
+      g.beginPath();
+      g.moveTo(wx - dir * 30, gy);
+      g.quadraticCurveTo(wx - dir * 12, gy - 32, wx + dir * 8, gy - 24);
+      g.quadraticCurveTo(wx + dir * 10, gy - 8, wx + dir * 10, gy);
+      g.closePath();
+      g.fill();
+      g.globalCompositeOperation = 'lighter';
+      g.fillStyle = 'rgba(240,255,255,0.8)';
+      for (let i = 0; i < 9; i++) {
+        const a = (i / 9) * Math.PI;
+        g.fillRect(
+          Math.round(wx - dir * 26 + Math.cos(a) * 30),
+          Math.round(gy - 18 - Math.sin(a) * 26),
+          2, 2,
+        );
+      }
+      g.restore();
+    }
+
+    // the sea tornadoes, spinning where he left them
+    for (const storm of c.storms) {
+      const sx = storm.x - this.cam.x;
+      if (sx < -90 || sx > W + 90) continue;
+      const gy = groundAt(L, clamp(storm.x, 0, L.width - 1));
+      const fade = clamp(1 - Math.max(0, storm.t - storm.dur + 0.8) / 0.8, 0, 1);
+      g.save();
+      g.globalAlpha = fade;
+      g.globalCompositeOperation = 'lighter';
+      for (let i = 0; i < 16; i++) {
+        const k = i / 16;
+        const y = gy - k * 78;
+        const r = 4 + Math.sin(k * Math.PI) * 16;
+        const a = this.time * 7 + i * 0.9;
+        g.fillStyle = i % 3 ? 'rgba(150,225,255,0.45)' : 'rgba(240,255,255,0.7)';
+        g.fillRect(Math.round(sx + Math.cos(a) * r), Math.round(y), 2, 2);
+        g.fillRect(Math.round(sx - Math.cos(a) * r * 0.8), Math.round(y + 2), 1, 1);
+      }
+      glow(g, sx, gy - 40, 26, '#9fe8ff', 0.25);
+      g.restore();
+    }
+
     if (c.beamOn) this.drawWildsBeam(g);
   }
 
   drawWildsFront(g) {
     const c = this.combat;
     if (!c) return;
+    for (const bolt of c.bolts) {
+      const sx = bolt.x - this.cam.x;
+      if (sx < -40 || sx > W + 40) continue;
+      this.drawBolt(g, bolt, sx);
+    }
     const look = this.shardLook();
     for (const shard of c.shards) {
       const sx = shard.x - this.cam.x;
@@ -4915,6 +5675,95 @@ export class Game {
       drawShardSprite(g, sx, shard.y, shard.vx, shard.vy, shard.spin, look);
     }
     for (const beam of c.guardianLasers) this.drawGuardianAnswer(g, beam);
+  }
+
+  // Every colour the glade's keepers throw, drawn as itself: an arrow, a fire
+  // ball, a heart, a kiss, a fish, a spore.
+  drawBolt(g, bolt, sx) {
+    const y = bolt.y;
+    g.save();
+    if (bolt.kind === 'fireball') {
+      g.globalCompositeOperation = 'lighter';
+      glow(g, sx, y, 30, '#ff8a3c', 0.55);
+      glow(g, sx, y, 18, '#ffd27a', 0.75);
+      g.fillStyle = '#ffb055';
+      g.beginPath();
+      g.arc(sx, y, 17, 0, TAU);
+      g.fill();
+      g.fillStyle = '#ffe6a8';
+      g.beginPath();
+      g.arc(sx, y, 10, 0, TAU);
+      g.fill();
+      g.fillStyle = '#fffdf0';
+      g.beginPath();
+      g.arc(sx, y, 5, 0, TAU);
+      g.fill();
+      // a trailing tail of flame
+      const d = Math.sign(bolt.vx) || 1;
+      for (let i = 1; i < 7; i++) {
+        g.globalAlpha = 0.5 - i * 0.06;
+        g.fillStyle = '#ff8a3c';
+        g.beginPath();
+        g.arc(sx - d * i * 5, y + Math.sin(this.time * 9 + i) * 3, 14 - i * 1.8, 0, TAU);
+        g.fill();
+      }
+    } else if (bolt.kind === 'heart') {
+      g.globalCompositeOperation = 'lighter';
+      glow(g, sx, y, 14, '#ff9ac8', 0.5);
+      g.fillStyle = '#ff5f95';
+      g.fillRect(sx - 3, y - 2, 7, 4);
+      g.fillRect(sx - 5, y - 4, 4, 4);
+      g.fillRect(sx + 2, y - 4, 4, 4);
+      g.fillRect(sx - 3, y + 2, 7, 2);
+      g.fillStyle = '#ffd9e8';
+      g.fillRect(sx - 3, y - 3, 2, 2);
+    } else if (bolt.kind === 'kiss') {
+      g.globalCompositeOperation = 'lighter';
+      glow(g, sx, y, 13, '#ff6f91', 0.5);
+      g.fillStyle = '#ff6f91';
+      g.fillRect(sx - 4, y - 2, 9, 3);
+      g.fillRect(sx - 5, y - 1, 2, 3);
+      g.fillRect(sx + 4, y - 1, 2, 3);
+      g.fillStyle = '#5c1024';
+      g.fillRect(sx - 3, y, 7, 1);
+      g.fillStyle = '#ffd6e2';
+      g.fillRect(sx - 2, y - 2, 3, 1);
+    } else if (bolt.kind === 'fish') {
+      const d = Math.sign(bolt.vx) || 1;
+      g.fillStyle = '#9fe0ff';
+      g.beginPath();
+      g.ellipse(sx, y, 5, 2.6, 0.2 * d, 0, TAU);
+      g.fill();
+      g.beginPath();
+      g.moveTo(sx - d * 4, y);
+      g.lineTo(sx - d * 9, y - 3);
+      g.lineTo(sx - d * 9, y + 3);
+      g.closePath();
+      g.fill();
+      g.fillStyle = '#e8fbff';
+      g.fillRect(sx + d * 2, y - 1, 1, 1);
+    } else if (bolt.kind === 'arrow') {
+      const a = Math.atan2(bolt.vy, bolt.vx);
+      g.translate(sx, y);
+      g.rotate(a);
+      g.fillStyle = '#c8e0a8';
+      g.fillRect(-8, -1, 13, 2);
+      g.fillStyle = '#efe6c0';
+      g.fillRect(4, -1, 4, 2);
+      g.fillRect(7, -2, 2, 4);
+      g.fillStyle = '#7fc457';
+      g.fillRect(-8, -2, 2, 4);
+      g.restore();
+      g.save();
+      g.globalCompositeOperation = 'lighter';
+      glow(g, sx, y, 8, '#b6ff9a', 0.4);
+    } else {
+      g.globalCompositeOperation = 'lighter';
+      glow(g, sx, y, 10, '#c8ff9a', 0.55);
+      g.fillStyle = '#eaffd2';
+      g.fillRect(sx - 1, y - 1, 3, 3);
+    }
+    g.restore();
   }
 
   drawGuardianAnswer(g, beam) {
@@ -5112,6 +5961,8 @@ export class Game {
     const hasFoes = c.dogs.some((dog) => dog.alive)
       || c.spiders.some((spider) => spider.alive)
       || c.crabs.some((crab) => crab.alive)
+      || c.rats.some((rat) => rat.alive)
+      || c.elves.some((elf) => elf.alive)
       || (boss && boss.alive);
     const touch = typeof window !== 'undefined' && !!window.__touchButtons;
     const hint = bossAlive

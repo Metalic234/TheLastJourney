@@ -81,6 +81,26 @@ const BIOMES = {
     bright: 1100,
     music: 0.82,
   },
+  // A place too green to be entirely real: quick bells, warm air, bright pads.
+  jungle: {
+    root: 48,
+    chords: [
+      [48, 55, 60],
+      [53, 60, 65],
+      [45, 52, 57],
+      [50, 57, 62],
+    ],
+    scale: [0, 2, 4, 7, 9],
+    chordDur: 10,
+    padGain: 0.082,
+    bellGain: 0.072,
+    bellEvery: [1.9, 4.2],
+    wind: 0.028,
+    windFreq: 1150,
+    windQ: 0.6,
+    bright: 1650,
+    music: 0.86,
+  },
   mountain: {
     root: 42,
     chords: [
