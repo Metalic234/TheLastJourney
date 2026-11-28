@@ -47,6 +47,11 @@ int game_stamina(void);
 #ifdef GAME_TEST
 /* Host harness only: hand the run some souls so the wares can be exercised. */
 void game_test_souls(int n);
+/* Host harness only: jump to a road and one of its keepers (0..2). */
+void game_test_warp(int stage, int keeper);
+/* Host harness only: live hearts + kisses + fish (0), wave (1), storm (2),
+ * hearts (3), kisses (4) or fish (5) on the board right now. */
+int game_test_fx(int which);
 #endif
 
 /* Extras for host tools and tests. */

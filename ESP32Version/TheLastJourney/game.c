@@ -21,6 +21,8 @@
 #define MAX_MEM 4
 #define MAX_ARROWS 8
 #define MAX_CLONES 2
+#define MAX_BOLTS 12
+#define KEEPERS 3
 #define GND_STEP 2
 #define GND_MAX 1600
 
@@ -122,10 +124,18 @@ static Memory mems[MAX_MEM];
 static int mem_n, mem_taken;
 static Shard shards[MAX_SHARDS];
 
-/* ---- the two keepers -------------------------------------------------- */
+/* ---- the keepers ------------------------------------------------------ */
 /* Stage one ends with the tiger of the ruins, the third road with the water
- * dragon, and the wilds with the Forest Fairy. 0 = no boss on the road. */
-static const int BOSS_KIND[4] = { 0, 1, 2, 3 };
+ * dragon, and the wilds with three of them one after another: the Forest
+ * Fairy, the Love Goddess and the Ocean Rage God. -1 = no keeper left. */
+static const int BOSS_KIND[4][KEEPERS] = {
+  { 0, -1, -1 },
+  { 1, -1, -1 },
+  { 2, -1, -1 },
+  { 3, 4, 5 },
+};
+static int boss_qi;    /* which of the road's keepers stands there now */
+static float keeper_t; /* the note under the bar when the glade changes hands */
 
 typedef struct {
   int kind;              /* 1 tiger, 2 dragon, 3 fairy */
@@ -141,7 +151,10 @@ typedef struct {
   float flash;
   /* the Forest Fairy's own weather */
   float rain_t;
-  int rot;               /* which of her three powers comes next */
+  int rot;               /* which of her powers comes next */
+  /* the love goddess and the ocean god gather before they cast */
+  float cast_t;
+  int spell;
 } Boss;
 
 static Boss boss;
@@ -166,6 +179,29 @@ typedef struct {
 static Arrow arrows[MAX_ARROWS];
 static Fireball fball;
 static Clone clones[MAX_CLONES];
+
+/* ---- the love and the tide -------------------------------------------- */
+/* Twelve bolts in all: the Love Goddess' hearts and kisses and the ocean's
+ * fish share one pool, because only one keeper of the three ever stands. */
+typedef struct {
+  float x, y, vx, vy, life;
+  int kind;   /* 0 heart, 1 kiss, 2 fish */
+  int live;
+} Bolt;
+
+typedef struct {
+  float x, life;
+  int dir, live, hit;
+} Wave;
+
+typedef struct {
+  float x, life, tick;
+  int live;
+} Storm;
+
+static Bolt bolts[MAX_BOLTS];
+static Wave wave;
+static Storm storm;
 
 static float cam;
 static int state; /* 0 play, 1 clear, 2 dead, 3 end, 4 shop, 5 menu */
@@ -239,10 +275,18 @@ static int roll_souls(void) {
 /* ---- helpers ----------------------------------------------------------- */
 static void mem_str(char *b, int n);
 static void draw_boss(void);
+static void draw_weather(void);
 static void clear_weather(void);
+static void setup_boss(int kind);
 
 static float clampf(float v, float a, float b) {
   return v < a ? a : (v > b ? b : v);
+}
+
+static int keeper_count(int idx) {
+  int i, n = 0;
+  for (i = 0; i < KEEPERS; i++) if (BOSS_KIND[idx][i] >= 0) n++;
+  return n;
 }
 
 /* What her X is worth once the peddler's elements are in it. Any two feed
@@ -382,6 +426,46 @@ static void text_center(const char *s, int y, int scale, uint16_t col) {
 }
 
 /* ---- world reset ------------------------------------------------------- */
+/* One keeper takes the end of the road. The wilds call this again the moment
+ * the one before it falls, so the glade never stands empty. */
+static void setup_boss(int kind) {
+  boss.kind = kind;
+  /* The wilds' three are the long fight: each asks for more than the tiger's
+   * nine hits, and the tide more than the green. */
+  boss.max_hp = kind == 5 ? 16.0f : kind == 4 ? 14.0f
+              : kind == 3 ? 12.0f : (kind ? 9.0f : 0.0f);
+  boss.hp = boss.max_hp;
+  boss.alive = kind ? 1 : 0;
+  boss.active = 0;
+  boss.x = stage_len * 0.80f;
+  boss.home = boss.x;
+  /* the dragon keeps to the planks, at the near end of its bridge */
+  if (kind == 2 && has_bridge) boss.x = bridge_x0 + 22.0f;
+  boss.base_y = 0.0f;
+  boss.facing = -1;
+  boss.intro = 1.2f;
+  boss.cd = 1.5f;
+  boss.claw_t = 0.0f;
+  boss.pounce_t = 0.0f;
+  boss.pounce_x = boss.x;
+  boss.hop_t = 0.0f;
+  boss.hop_from = boss.x;
+  boss.hop_to = boss.x;
+  boss.lift = 0.0f;
+  boss.steam_t = 0.0f;
+  boss.steam_burst = 0.0f;
+  boss.hops = 0;
+  boss.bob = 0.0f;
+  boss.flash = 0.0f;
+  boss.burn_t = 0.0f;
+  boss.ice_t = 0.0f;
+  boss.shock_t = 0.0f;
+  boss.rain_t = 0.0f;
+  boss.rot = 0;
+  boss.cast_t = 0.0f;
+  boss.spell = 0;
+}
+
 static void reset_stage(int idx) {
   const StageCfg *cfg;
   int i;
@@ -470,7 +554,7 @@ static void reset_stage(int idx) {
   /* the purse for this road, filled before she takes a step */
   purse = 35 + rand() % 46;
   purse_start = purse;
-  purse_left = spider_n + (BOSS_KIND[idx] ? 1 : 0);
+  purse_left = spider_n + keeper_count(idx);
   {
     static const float sfrac[10] = {
       0.22f, 0.34f, 0.46f, 0.56f, 0.66f, 0.74f, 0.80f, 0.84f, 0.88f, 0.92f
@@ -487,37 +571,9 @@ static void reset_stage(int idx) {
   for (i = 0; i < MAX_SHARDS; i++) shards[i].live = 0;
   clear_weather();
 
-  boss.kind = BOSS_KIND[idx];
-  /* The fairy is the longest fight of the four: her wood fights for her. */
-  boss.max_hp = boss.kind == 3 ? 12.0f : (boss.kind ? 9.0f : 0.0f);
-  boss.hp = boss.max_hp;
-  boss.alive = boss.kind ? 1 : 0;
-  boss.active = 0;
-  boss.x = stage_len * 0.80f;
-  boss.home = boss.x;
-  /* the dragon keeps to the planks, at the near end of its bridge */
-  if (boss.kind == 2 && has_bridge) boss.x = bridge_x0 + 22.0f;
-  boss.base_y = 0.0f;
-  boss.facing = -1;
-  boss.intro = 1.2f;
-  boss.cd = 1.5f;
-  boss.claw_t = 0.0f;
-  boss.pounce_t = 0.0f;
-  boss.pounce_x = boss.x;
-  boss.hop_t = 0.0f;
-  boss.hop_from = boss.x;
-  boss.hop_to = boss.x;
-  boss.lift = 0.0f;
-  boss.steam_t = 0.0f;
-  boss.steam_burst = 0.0f;
-  boss.hops = 0;
-  boss.bob = 0.0f;
-  boss.flash = 0.0f;
-  boss.burn_t = 0.0f;
-  boss.ice_t = 0.0f;
-  boss.shock_t = 0.0f;
-  boss.rain_t = 0.0f;
-  boss.rot = 0;
+  boss_qi = 0;
+  keeper_t = 0.0f;
+  setup_boss(BOSS_KIND[idx][0]);
   /* The ward is spent, not mended: a road that finds it used leaves it used. */
 
   cam = 0;
@@ -599,6 +655,17 @@ static void boss_die(void) {
   boss.alive = 0;
   clear_weather();
   souls += roll_souls();
+  /* The glade changes hands: the next keeper steps out of the green. */
+  {
+    int qi = boss_qi + 1;
+    while (qi < KEEPERS && BOSS_KIND[stage_i][qi] < 0) qi++;
+    if (qi < KEEPERS && BOSS_KIND[stage_i][qi] >= 0) {
+      boss_qi = qi;
+      setup_boss(BOSS_KIND[stage_i][qi]);
+      boss.intro = 1.6f;
+      keeper_t = 2.4f;
+    }
+  }
 }
 
 /* ---- the fairy's weather ----------------------------------------------- */
@@ -606,7 +673,69 @@ static void clear_weather(void) {
   int i;
   for (i = 0; i < MAX_ARROWS; i++) arrows[i].live = 0;
   for (i = 0; i < MAX_CLONES; i++) clones[i].life = 0.0f;
+  for (i = 0; i < MAX_BOLTS; i++) bolts[i].live = 0;
   fball.live = 0;
+  wave.live = 0;
+  storm.live = 0;
+}
+
+static void bolt_spawn(int kind, float x, float y, float vx, float vy, float life) {
+  int i;
+  for (i = 0; i < MAX_BOLTS; i++) {
+    if (bolts[i].live) continue;
+    bolts[i].kind = kind;
+    bolts[i].x = x;
+    bolts[i].y = y;
+    bolts[i].vx = vx;
+    bolts[i].vy = vy;
+    bolts[i].life = life;
+    bolts[i].live = 1;
+    return;
+  }
+}
+
+/* SHOOTING LOVE: three hearts fanned at her, and a poisoned kiss thrown
+ * underhand so it arcs. Two powers, no more: the glade is narrow. */
+static void love_cast(void) {
+  float ey = ground_y(boss.x) - 26.0f;
+  float hand = boss.x + (p.x > boss.x ? 10.0f : -10.0f);
+  if (boss.spell == 0) {
+    float base = atan2f((p.y - 12.0f) - ey, p.x - boss.x);
+    int i;
+    for (i = -1; i <= 1; i++) {
+      float a = base + (float)i * 0.26f;
+      bolt_spawn(0, hand, ey, cosf(a) * 104.0f, sinf(a) * 104.0f, 4.0f);
+    }
+  } else {
+    float a = atan2f((p.y - 16.0f) - ey, p.x - boss.x) - 0.18f;
+    bolt_spawn(1, hand, ey, cosf(a) * 128.0f, sinf(a) * 128.0f - 24.0f, 3.4f);
+  }
+  boss.spell = 0;
+}
+
+/* THE GREAT WAVE runs the glade low, THE TORNADO stands where she was, and
+ * THE RAIN OF FISHES falls over the whole of it. */
+static void ocean_cast(void) {
+  int i;
+  if (boss.spell == 0) {
+    wave.x = boss.x + (float)boss.facing * 18.0f;
+    wave.dir = boss.facing;
+    wave.life = 3.4f;
+    wave.hit = 0;
+    wave.live = 1;
+  } else if (boss.spell == 1) {
+    storm.x = clampf(p.x + (p.x > boss.x ? 26.0f : -26.0f), 20.0f, stage_len - 20.0f);
+    storm.life = 4.0f;
+    storm.tick = 0.5f;
+    storm.live = 1;
+  } else {
+    for (i = 0; i < 6; i++) {
+      float fx = clampf(p.x - 75.0f + (float)i * 30.0f, 14.0f, stage_len - 14.0f);
+      bolt_spawn(2, fx, -10.0f - (float)(i & 1) * 8.0f,
+                 (float)((i & 1) ? 10 : -10), 150.0f + (float)(i % 3) * 20.0f, 4.5f);
+    }
+  }
+  boss.spell = 0;
 }
 
 /* Poisoned arrows fall where she stands, the fireball rolls along the ground
@@ -655,6 +784,49 @@ static void update_weather(float dt) {
       c->fire_cd = 1.4f;
     }
   }
+
+  /* the love and the tide share the bolt pool */
+  for (i = 0; i < MAX_BOLTS; i++) {
+    Bolt *b = &bolts[i];
+    if (!b->live) continue;
+    b->x += b->vx * dt;
+    b->y += b->vy * dt;
+    b->life -= dt;
+    if (b->kind == 1) b->vy += 90.0f * dt;       /* the kiss arcs */
+    else if (b->kind == 2) b->vy += 40.0f * dt;  /* the fish falls harder */
+    if (p.invuln <= 0.0f && fabsf(p.x - b->x) < 7.0f
+        && b->y > p.y - 20.0f && b->y < p.y + 3.0f) {
+      b->live = 0;
+      hurt(1);
+      continue;
+    }
+    if (b->life <= 0.0f || b->x < 4.0f || b->x > stage_len - 4.0f
+        || b->y > ground_y(b->x) + 2.0f || b->y > (float)H + 8.0f) b->live = 0;
+  }
+  if (wave.live) {
+    float crest;
+    wave.x += (float)wave.dir * 132.0f * dt;
+    wave.life -= dt;
+    crest = ground_y(wave.x) - 6.0f;
+    if (!wave.hit && p.invuln <= 0.0f && fabsf(p.x - wave.x) < 13.0f
+        && p.y > crest - 4.0f) {
+      wave.hit = 1;
+      hurt(1);
+    }
+    if (wave.life <= 0.0f || wave.x < 6.0f || wave.x > stage_len - 6.0f
+        || ground_y(wave.x) > 300.0f) wave.live = 0;
+  }
+  if (storm.live) {
+    storm.life -= dt;
+    storm.tick -= dt;
+    if (storm.tick <= 0.0f && p.invuln <= 0.0f
+        && fabsf(p.x - storm.x) < 16.0f
+        && p.y > ground_y(storm.x) - 26.0f) {
+      storm.tick = 1.0f;
+      hurt(1);
+    }
+    if (storm.life <= 0.0f) storm.live = 0;
+  }
 }
 
 static void update_boss(float dt) {
@@ -685,7 +857,7 @@ static void update_boss(float dt) {
   if (boss.intro > 0.0f) { boss.intro -= dt; return; }
   boss.facing = (p.x < boss.x) ? -1 : 1;
   ad = fabsf(p.x - boss.x);
-  if (boss.kind == 3) update_weather(dt);
+  if (boss.kind >= 3) update_weather(dt);
 
   if (boss.kind == 1) {
     /* the tiger: closes the gap on two legs, swipes, and leaps at her mark */
@@ -752,6 +924,43 @@ static void update_boss(float dt) {
         }
         boss.cd = 2.6f;
       }
+      boss.rot = (boss.rot + 1) % 3;
+    }
+  } else if (boss.kind == 4) {
+    /* the Love Goddess: she hovers just off the ground, fans hearts at her
+     * mark and throws kisses that arc and come down poisoned */
+    boss.lift = 4.0f + sinf(boss.bob * 1.6f) * 2.0f;
+    if (boss.cast_t > 0.0f) {
+      boss.cast_t -= sdt;
+      if (boss.cast_t <= 0.0f) love_cast();
+      else return;
+    }
+    if (ad > 150.0f) boss.x += (p.x > boss.x ? 1.0f : -1.0f) * 26.0f * sdt;
+    else if (ad < 84.0f) boss.x -= (p.x > boss.x ? 1.0f : -1.0f) * 22.0f * sdt;
+    boss.x = clampf(boss.x, boss.home - 90.0f, boss.home + 90.0f);
+    boss.cd -= sdt;
+    if (boss.cd <= 0.0f) {
+      boss.spell = boss.rot & 1;  /* hearts, then the kiss, then hearts */
+      boss.cast_t = 0.7f;
+      boss.cd = 2.2f;
+      boss.rot = (boss.rot + 1) % 2;
+    }
+  } else if (boss.kind == 5) {
+    /* the Ocean Rage God: the great wave, the tornado and a sky of fishes */
+    boss.lift = 0.0f;
+    if (boss.cast_t > 0.0f) {
+      boss.cast_t -= sdt;
+      if (boss.cast_t <= 0.0f) ocean_cast();
+      else return;
+    }
+    if (ad > 150.0f) boss.x += (p.x > boss.x ? 1.0f : -1.0f) * 22.0f * sdt;
+    else if (ad < 78.0f) boss.x -= (p.x > boss.x ? 1.0f : -1.0f) * 16.0f * sdt;
+    boss.x = clampf(boss.x, boss.home - 90.0f, boss.home + 90.0f);
+    boss.cd -= sdt;
+    if (boss.cd <= 0.0f) {
+      boss.spell = boss.rot;
+      boss.cast_t = 0.9f;
+      boss.cd = 2.4f;
       boss.rot = (boss.rot + 1) % 3;
     }
   } else {
@@ -1175,6 +1384,8 @@ static void draw_world(void) {
     px(cx + 2, cy - 11, to565(0x9FFFB0));
   }
 
+  draw_weather();
+
   /* Her X wears whatever the peddler put in it: flame, a violet bolt, the
    * same white shard she started with — and a look of its own once two or
    * three elements are in it. */
@@ -1316,6 +1527,63 @@ static void draw_boss(void) {
     px(bx + 7, by - 19, to565(0xFFF0A0));
     /* while the rain is strung, a green line gathers over her */
     if (boss.rain_t > 0.0f) rect(bx - 7, by - 27, 15, 2, to565(0x9FFFB0));
+  } else if (boss.kind == 4) {
+    /* the Love Goddess: pink, crowned, with her heart already in her hand */
+    int wing = (int)(sinf(boss.bob * 5.0f) * 2.0f);
+    disc(bx, by - 22, 14, to565(0x4A1230));
+    disc(bx, by - 22, 11, to565(0x7A1E4A));
+    disc(bx - 10, by - 26 + wing, 5, to565(0xFFB0D8));
+    disc(bx + 10, by - 26 - wing, 5, to565(0xFFB0D8));
+    rect(bx - 6, by - 18, 12, 18, to565(0xFF7AB0));
+    rect(bx - 8, by - 6, 16, 3, to565(0xFFB0D8));
+    rect(bx - 5, by - 26, 10, 9, to565(0xE8C0A0));
+    rect(bx - 8, by - 28, 16, 4, to565(0x8A2A50));
+    rect(bx - 8, by - 25, 3, 12, to565(0x8A2A50));
+    rect(bx + 6, by - 25, 3, 12, to565(0x8A2A50));
+    px(bx - 2, by - 22, to565(0x1A1020));
+    px(bx + 2, by - 22, to565(0x1A1020));
+    px(bx - 3, by - 20, to565(0xFF5A96));
+    px(bx + 3, by - 20, to565(0xFF5A96));
+    for (i = -5; i <= 5; i += 5) rect(bx + i, by - 31, 3, 3, to565(0xFFD166));
+    px(bx, by - 33, to565(0xFF5A96));
+    /* the heart she is holding out */
+    disc(bx + 9, by - 18, 2, to565(0xFF5A96));
+    disc(bx + 13, by - 18, 2, to565(0xFF5A96));
+    rect(bx + 8, by - 17, 7, 2, to565(0xFF5A96));
+    px(bx + 10, by - 14, to565(0xFFB0D8));
+    /* while she gathers, the heart in her hand swells */
+    if (boss.cast_t > 0.0f) disc(bx + 12, by - 18, 5, to565(0xFFB0D8));
+  } else if (boss.kind == 5) {
+    /* the Ocean Rage God: a tall figure of the tide, coral on his brow and
+     * a trident in his hand */
+    int k;
+    disc(bx, by - 34, 15, to565(0x0E3A48));
+    disc(bx, by - 34, 12, to565(0x1D6A7A));
+    rect(bx - 10, by - 30, 20, 30, to565(0x1D5A60));
+    rect(bx - 13, by - 24, 26, 6, to565(0x2A8AA0));
+    rect(bx - 7, by - 30, 14, 10, to565(0x8FC9BF));
+    rect(bx - 6, by - 40, 12, 11, to565(0x9FD8C8));
+    px(bx - 3, by - 36, to565(0x0A2030));
+    px(bx + 3, by - 36, to565(0x0A2030));
+    rect(bx - 5, by - 38, 10, 2, to565(0xC9F0E4));
+    for (k = 0; k < 3; k++) {
+      int cx = bx - 5 + k * 5;
+      rect(cx, by - 45, 1, 6, to565(0xE0607A));
+      px(cx + 1, by - 46, to565(0xFF9AC8));
+    }
+    /* the trident */
+    rect(bx + 15, by - 46, 2, 40, to565(0x8A6238));
+    rect(bx + 12, by - 50, 8, 2, to565(0xCFEAE4));
+    rect(bx + 11, by - 48, 2, 3, to565(0xCFEAE4));
+    rect(bx + 19, by - 48, 2, 3, to565(0xCFEAE4));
+    rect(bx + 15, by - 52, 2, 3, to565(0xCFEAE4));
+    rect(bx - 8, by - 8, 6, 8, to565(0x143A48));
+    rect(bx + 2, by - 8, 6, 8, to565(0x143A48));
+    for (k = 0; k < 3; k++) {
+      int sw = 18 - k * 4;
+      rect(bx - sw / 2, by - 2 + k, sw, 1, to565(0x2A8AA0));
+    }
+    if (boss.cast_t > 0.0f) disc(bx + 26, by - 46, 4, to565(0xEAFAFF));
   } else {
     rect(bx - 16, by - 22, 30, 12, to565(0x1D5A60));
     rect(bx - 14, by - 25, 24, 6, to565(0x8FC9BF));
@@ -1340,6 +1608,72 @@ static void draw_boss(void) {
     }
   }
   if (boss.flash > 0.0f) rect(bx - 18, by - 46, 36, 46, to565(0xFFFFFF));
+}
+
+/* The love and the tide, over the road she stands on. Hearts, kisses and fish
+ * come out of one pool, and there is never more than one wave and one storm. */
+static void draw_weather(void) {
+  int i;
+  for (i = 0; i < MAX_BOLTS; i++) {
+    int bx, by;
+    const Bolt *b = &bolts[i];
+    if (!b->live) continue;
+    bx = (int)(b->x - cam);
+    by = (int)b->y;
+    if (bx < -10 || bx > W + 10) continue;
+    if (b->kind == 0) {
+      /* a thrown heart: two lobes over a point, with the poison on it */
+      disc(bx - 2, by - 1, 2, to565(0xFF5A96));
+      disc(bx + 2, by - 1, 2, to565(0xFF5A96));
+      rect(bx - 3, by, 7, 1, to565(0xFF5A96));
+      rect(bx - 2, by + 1, 5, 1, to565(0xFF8AC0));
+      px(bx, by + 2, to565(0xFFB0D8));
+      px(bx, by + 3, to565(0xFFB0D8));
+      px(bx - 1, by + 4, to565(0x9FFFB0));
+    } else if (b->kind == 1) {
+      /* a blown kiss: lips, and a green vapour trailing behind */
+      rect(bx - 3, by, 3, 2, to565(0xFF5A96));
+      rect(bx + 1, by, 3, 2, to565(0xFF5A96));
+      px(bx - 1, by + 1, to565(0xB0264E));
+      px(bx + 1, by + 1, to565(0xB0264E));
+      px(bx - 6, by + 1, to565(0x7DE08A));
+      px(bx - 5, by - 1, to565(0x4FB06A));
+    } else {
+      /* a fish out of the sky: body, tail and one bright eye */
+      rect(bx - 4, by - 1, 6, 3, to565(0x7FD8FF));
+      rect(bx - 3, by - 2, 4, 1, to565(0xBFE9FF));
+      px(bx + 3, by - 2, to565(0x7FD8FF));
+      px(bx + 3, by + 1, to565(0x7FD8FF));
+      px(bx + 4, by, to565(0xBFE9FF));
+      px(bx + 1, by, to565(0x0A2030));
+    }
+  }
+  if (wave.live) {
+    int wx = (int)(wave.x - cam);
+    int wy = (int)ground_y(wave.x);
+    int s;
+    for (s = 0; s < 20; s++) {
+      int hw = 10 + s / 3;
+      rect(wx - hw, wy - 20 + s, hw * 2, 1,
+           s < 3 ? to565(0xDFF8F4) : s < 8 ? to565(0x4FA8C8) : to565(0x2A6A8A));
+    }
+    disc(wx + wave.dir * 9, wy - 18, 4, to565(0xEAFAFF));
+    px(wx + wave.dir * 13, wy - 20, to565(0xDFF8F4));
+  }
+  if (storm.live) {
+    int sx = (int)(storm.x - cam);
+    int sy = (int)ground_y(storm.x);
+    int k;
+    for (k = 0; k < 34; k++) {
+      float a = (float)k * 0.55f + storm.life * 6.0f;
+      int r = 4 + (k / 5) * 2;
+      px(sx + (int)(cosf(a) * (float)r), sy - 4 - k,
+         k < 12 ? to565(0xBFE9FF) : to565(0x7FD8FF));
+      if ((k & 1) == 0)
+        px(sx + (int)(cosf(a + 3.14159f) * (float)r), sy - 4 - k, to565(0x4FA8C8));
+    }
+    disc(sx, sy - 4, 7, to565(0x9FE0F0));
+  }
 }
 
 /* Her life runs purple at full, then blue, green, yellow, orange and red.
@@ -1402,8 +1736,13 @@ static void draw_hud(void) {
 
   if (boss.alive && boss.active && boss.kind == 2 && boss.steam_t > 0.0f) {
     text_center("STEAM COMING - JUMP IT", H - 12, 1, to565(0xFFE0A0));
+  } else if (fball.live) {
+    text_center("FIREBALL - JUMP IT", H - 12, 1, to565(0xFFB066));
+  } else if (wave.live) {
+    text_center("THE WAVE - JUMP IT", H - 12, 1, to565(0x9FE0F0));
+  } else if (storm.live) {
+    text_center("TORNADO - RUN", H - 12, 1, to565(0x9FE0F0));
   }
-  if (fball.live) text_center("FIREBALL - JUMP IT", H - 12, 1, to565(0xFFB066));
 
   if (banner > 0.0f) {
     text_center(STAGES[stage_i].name, 56, 1, to565(0xF0ECDC));
@@ -1414,6 +1753,7 @@ static void draw_hud(void) {
       text_center("LEFT+RIGHT: THE MENU", H - 32, 1, to565(0x8D869F));
     }
   }
+  if (keeper_t > 0.0f) text_center("THE GLADE CHANGES HANDS", 84, 1, to565(0xFFD9A0));
 
   if (state == 1) {
     text_center("STAGE CLEAR", 78, 2, to565(0xFFF2C0));
@@ -1597,6 +1937,7 @@ void game_update(float dt, GameInput in) {
   if (dt <= 0) dt = 0.016f;
   if (dt > 0.1f) dt = 0.1f;
   if (banner > 0.0f) banner -= dt;
+  if (keeper_t > 0.0f) keeper_t -= dt;
 
   if (state == 1) {
     state_t -= dt;
@@ -1654,6 +1995,45 @@ int game_bots_killed(void) { return bots_killed; }
 
 #ifdef GAME_TEST
 void game_test_souls(int n) { souls += n; }
+
+/* Host harness only: jump straight to a road and one of its keepers, with a
+ * whole heart bar, so each keeper's weather can be watched on its own. */
+void game_test_warp(int stage, int keeper) {
+  int qi = 0;
+  reset_stage(stage);
+  while (qi < keeper && qi + 1 < KEEPERS) {
+    if (BOSS_KIND[stage][qi + 1] < 0) break;
+    qi++;
+    boss_qi = qi;
+  }
+  setup_boss(BOSS_KIND[stage][qi] >= 0 ? BOSS_KIND[stage][qi] : 0);
+  boss.intro = 0.2f;
+  p.hp = max_hp;
+  p.x = clampf(boss.home - 120.0f, 8.0f, stage_len - 8.0f);
+  p.y = ground_y(p.x);
+  p.vx = 0;
+  p.vy = 0;
+  p.on_ground = 1;
+  state = 0;
+  state_t = 0;
+  keeper_t = 0.0f;
+  banner = 1.0f;
+}
+
+/* Host harness only: what of a keeper's weather is on the board right now. */
+int game_test_fx(int which) {
+  int i, n = 0;
+  if (which == 1) return wave.live;
+  if (which == 2) return storm.live;
+  for (i = 0; i < MAX_BOLTS; i++) {
+    if (!bolts[i].live) continue;
+    if (which == 0) n++;
+    else if (which == 3 && bolts[i].kind == 0) n++;
+    else if (which == 4 && bolts[i].kind == 1) n++;
+    else if (which == 5 && bolts[i].kind == 2) n++;
+  }
+  return n;
+}
 #endif
 
 /* Extras for host tools and tests. */

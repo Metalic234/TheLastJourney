@@ -10,8 +10,9 @@ WHAT IT IS (AND IS NOT)
 -----------------------
 This is the pocket edition, not a byte-for-byte port of the desktop game.
 It keeps the shape of the story — four roads, memory shards to collect,
-spiders on the path, a keeper at the end of the last three roads, a death
-that restarts the stage, and an ending — but it runs with simplified art,
+spiders on the path, a keeper at the end of the last three roads (three of
+them hold the last), a death that restarts the stage, and an ending — but it
+runs with simplified art,
 no voyage and no sound. The full game stays on Android, Windows and the
 web.
 
@@ -57,7 +58,14 @@ and cannot be walked past.
                            and takes a heart — unless she is in the air:
                            it rolls low along the planks, so a jump clears
                            it.
-  THE FOREST FAIRY         ends the Verdant Wilds, the fourth road. She
+  THE VERDANT WILDS        ends in three keepers, one after another, all
+                           in the same glade: the Forest Fairy, then the
+                           Love Goddess, then the Ocean Rage God. Killing
+                           one does not open the road; the next steps out
+                           of the green as the one before it falls, and
+                           their weather is wiped with them.
+
+  THE FOREST FAIRY         first of the three. She
                            hovers out of reach and lets the wood fight for
                            her:
                              POISONED ARROWS   six of them come out of the
@@ -75,12 +83,38 @@ and cannot be walked past.
                                                an arrow every second and a
                                                half. Only the bright one
                                                takes a shard.
-                           Her bar is longer than the other two keepers':
+                           Her bar is longer than the first two keepers':
                            twelve hits against their nine.
 
+  THE LOVE GODDESS         second of the three. She hovers just off the
+                           ground, crowned and pink, and throws:
+                             SHOOTING LOVE     three hearts in a fan, aimed
+                                               at wherever she stands. Move,
+                                               and the fan misses behind her.
+                             A POISONED KISS   one kiss, thrown underhand,
+                                               so it arcs and comes down on
+                                               her mark. Its vapour is green.
+                           Fourteen hits.
+
+  THE OCEAN RAGE GOD       last of the three, and the longest bar of the
+                           game at sixteen hits. He stands on the road with
+                           a coral crown and a trident, and calls:
+                             THE GREAT WAVE    one wall of water runs the
+                                               glade low. It rolls along the
+                                               ground: a jump clears it.
+                             THE TORNADO       a spinning column stands where
+                                               she was a moment ago and takes
+                                               a heart every second she stays
+                                               in it. Running out of it is the
+                                               answer; it cannot be jumped.
+                             THE RAIN OF FISHES six fish fall out of the
+                                               sky across the whole glade.
+                                               Keep moving and they land
+                                               behind her.
+
 Shards wear a keeper down; its health bar sits at the top of the screen.
-Both of them are worth a payout from the road's soul purse, and the road
-only opens once the keeper is down.
+Each of them is worth a payout from the road's soul purse, and the road
+only opens once the last keeper of it is down.
 
 THE SOUL PEDDLER
 ----------------
@@ -163,12 +197,18 @@ the image when pushing it, or switch the panel offset.
 At 40 MHz SPI the display update is roughly 25 ms, so the game is capped
 at 30 fps in the sketch. Lower FRAME_TIME to taste.
 
-The fourth road did not need a bigger board. Static state is 123,008 bytes
-of .bss plus 1,600 bytes of initialised data — 124.6 KB in all, of which
-115,200 bytes are the framebuffer. The whole game, every road, the tiger,
-the dragon and the fairy ask for 288 bytes more than the three-road build
-did: the wilds' stage record, eight falling arrows, one fireball and two
-shadow clones.
+The fourth road did not need a bigger board. As `size` reports it on the
+host build, static state is 123,392 bytes of .bss — 115,200 of them the
+framebuffer — plus 868 bytes of initialised data. The whole game, every
+road and all
+five keepers ask for 288 bytes more than the three-road build did (the
+wilds' stage record, eight falling arrows, one fireball and two shadow
+clones), and the Love Goddess and the Ocean Rage God add 416 bytes on top of
+that: twelve shared bolts for hearts, kisses and fish, one wave, one storm
+and the little they need to gather a spell. Their attacks were trimmed to
+the board: three hearts at a time, one kiss, six fish, one wave and one
+tornado, which is what a 320x180 screen can show and what 416 bytes can
+hold.
 
 TRY IT WITHOUT HARDWARE
 -----------------------
@@ -180,9 +220,14 @@ it on a desktop, plays a scripted run and writes PPM frames:
 
 That is how this port was tested: it compiles warning-free with
 -Wall -Wextra, the scripted runner clears all four roads — the tiger, the
-dragon and the Forest Fairy among them — and reaches the ending (frame
-dumps show the title cards, the pits, the spiders, the memories, the
-burning city, the wilds and THE END).
+dragon and the three keepers of the wilds among them, in order — and
+reaches the ending (frame dumps show the title cards, the pits, the
+spiders, the memories, the burning city, the wilds and THE END).
+
+Each keeper was also watched on its own in the glade, with no shards
+thrown: the hearts fan, the arcing kiss, the rolling wave, the tornado and
+the rain of fishes all appeared on the board, and each of them took a heart
+from her where it caught her.
 
 FILES
 -----

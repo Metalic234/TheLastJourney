@@ -45,6 +45,7 @@ int main(int argc, char **argv) {
   int seen_stage = -1;
   int boss_kind[4] = { 0, 0, 0, 0 };
   int boss_hp[4] = { 0, 0, 0, 0 };
+  int last_keeper = 0;
 
   game_init();
 
@@ -111,6 +112,14 @@ int main(int argc, char **argv) {
     }
     boss_kind[game_stage()] = game_boss_kind();
     boss_hp[game_stage()] = game_boss_hp();
+    /* every keeper that takes the glade is announced as it steps in */
+    if (game_boss_kind() != last_keeper) {
+      if (last_keeper > 0) {
+        printf("keeper %d down, keeper %d stands (stage %d, frame %d)\n",
+               last_keeper, game_boss_kind(), game_stage(), f);
+      }
+      last_keeper = game_boss_kind();
+    }
 
     game_update(dt, in);
     {
